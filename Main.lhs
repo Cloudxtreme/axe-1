@@ -6,4 +6,4 @@
 > import Interleaving
 
 > main :: IO ()
-> main = quickCheckWith (withNumTests 1000000) testTSO
+> main = quickCheckWith (withNumTests 1000000) testTSOMinusSA

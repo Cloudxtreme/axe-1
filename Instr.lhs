@@ -200,7 +200,7 @@ The state of the generator is a tuple containing:
 Random trace generator.
 
 > genTrace :: TraceOptions -> Gen [[Instr]]
-> genTrace opts = threads <$> step initialState
+> genTrace opts = (prunePropTo . threads) <$> step initialState
 >   where
 >     pick xs = oneof (map return xs)
 >
@@ -269,6 +269,24 @@ Random trace generator.
 >                           else (n, nsync, m, instrs)
 >              genLoadOrStore threadId state' >>= step
 
+The 'propTo' field of a store instruction contains all the thread ids
+that the write must be propagated to.  Initially, this is just the
+list of all thread ids in the program.  For improved performance, we
+prune the list so that it contains only threads that read from the
+address of the write.
+
+> prunePropTo :: [[Instr]] -> [[Instr]]
+> prunePropTo trace =
+>   [ [ if   op i == STORE
+>       then i { propTo = M.findWithDefault [tid i] (addr i) m }
+>       else i
+>     | i <- is ]
+>   | is <- trace
+>   ]
+>   where
+>     loads = [(addr i, [tid i]) | i <- concat trace, op i == LOAD ]
+>     m     = foldr (\(a, ts) -> M.insertWith union a ts) M.empty loads
+
 Generator for small traces:
 
 > smallTraces :: Gen Trace
@@ -277,10 +295,10 @@ Generator for small traces:
 >     opts = TraceOptions {
 >              --  totalInstrs   = 8
 >              --, totalThreads  = 4 
->                  totalInstrs   = 5
->                , totalThreads  = 3
->                , maxVals       = 2
->                , maxAddrs      = 2
+>                  totalInstrs   = 8
+>                , totalThreads  = 4
+>                , maxVals       = 3
+>                , maxAddrs      = 3
 >                , maxSyncs      = 0 
 >                , assumeLocalCO = True
 >            }

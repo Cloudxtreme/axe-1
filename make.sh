@@ -1,1 +1,1 @@
-ghc -O2 --make Main.lhs
+ghc -O --make Main.lhs
