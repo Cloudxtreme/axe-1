@@ -2,6 +2,7 @@
 
 > import Instr
 > import Constraint
+> import Axiomatic.RelaxSA
 > import qualified Data.Map as M
 
 Program-order edges
@@ -14,11 +15,11 @@ Program-order edges
 >     thread [x]      = []
 >     thread (x:y:zs) = (uid x :-> uid y) : thread (y:zs)
 
-Reads-from and coherence edges
-==============================
+Reads-from and write-order edges
+================================
 
-> rfco :: [[Instr]] -> [Constraint]
-> rfco trace = concatMap cons loads
+> rfwo :: [[Instr]] -> [Constraint]
+> rfwo trace = concatMap cons loads
 >   where
 >     loads = filter (\x -> op x == LOAD) (concat trace)
 > 
@@ -42,10 +43,16 @@ SC constraints
 Given a trace, generate constraints for sequential consistency.
 
 > constraintsSC :: [[Instr]] -> [Constraint]
-> constraintsSC = po \/ rfco
+> constraintsSC = po \/ rfwo
 
-Solver
-======
+> constraintsSCMinusSA :: [[Instr]] -> [Constraint]
+> constraintsSCMinusSA = relaxSA po rfwo
+
+Solvers
+=======
 
 > isSC :: [[Instr]] -> Bool
 > isSC = yices . constraintsSC
+
+> isSCMinusSA :: [[Instr]] -> Bool
+> isSCMinusSA = yices . constraintsSCMinusSA

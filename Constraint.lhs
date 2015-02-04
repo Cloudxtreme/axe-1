@@ -12,6 +12,8 @@ Types
 > data Constraint =
 >     InstrId :-> InstrId
 >   | Constraint :|: Constraint
+>   | Constraint :<=> Constraint
+>   | Fail
 
 Combinators
 ===========
@@ -34,12 +36,17 @@ Convert constraint to Yices format.
 >   where
 >     var v = "v" ++ show v
 >
->     vars (x :-> y) = [var x, var y]
->     vars (c :|: d) = vars c ++ vars d
+>     vars (x :-> y)  = [var x, var y]
+>     vars (c :|: d)  = vars c ++ vars d
+>     vars (c :<=> d) = vars c ++ vars d
+>     vars Fail       = []
 >
 >     translate (x :-> y) = "(< " ++ var x ++ " " ++ var y ++ ")"
 >     translate (c :|: d) =
 >       "(or " ++ translate c ++ " " ++ translate d ++ ")"
+>     translate (c :<=> d) =
+>       "(= " ++ translate c ++ " " ++ translate d ++ ")"
+>     translate Fail = "false"
 >
 >     assert c = "(assert " ++ translate c ++ ")"
 >

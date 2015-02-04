@@ -11,7 +11,20 @@ Syntax of instruction traces
 Unique instruction identifiers
 ------------------------------
 
-> type InstrId = Int
+Instruction IDs are typically integers, but sometimes it is useful to
+create several new unique IDs out of an existing one, hence the :::
+operator.
+
+> data InstrId =
+>     Id Int
+>   | Tag InstrId Int
+>   deriving (Eq, Ord)
+
+As a shorthand for the tag constructor
+
+> infixl 5 #
+> (#) :: InstrId -> Int -> InstrId
+> x # y = Tag x y
 
 Thread identifiers
 ------------------
@@ -30,7 +43,9 @@ Opcodes
 Addresses
 ---------
 
-> newtype Addr = Addr Int
+> data Addr =
+>     Addr Int
+>   | Addr :@ ThreadId
 >   deriving (Eq, Ord)
 
 Data
@@ -48,11 +63,12 @@ In the case of SYNC, the address and data fields are unused.
 
 > data Instr =
 >   Instr {
->     uid  :: InstrId
->   , tid  :: ThreadId
->   , op   :: Opcode
->   , addr :: Addr
->   , val  :: Data
+>     uid    :: InstrId
+>   , tid    :: ThreadId
+>   , op     :: Opcode
+>   , addr   :: Addr
+>   , val    :: Data
+>   , propTo :: [ThreadId]
 >   }
 
 Pretty printer
@@ -60,8 +76,13 @@ Pretty printer
 
 > newtype Trace = Trace [[Instr]]
 
+> instance Show InstrId where
+>   show (Id a) = show a
+>   show (Tag x y) = show x ++ "_" ++ show y
+
 > instance Show Addr where
 >   show (Addr a) = show a
+>   show (a:@t) = show a ++ "@" ++ show t
 
 > instance Show Data where
 >   show (Data d) = show d
@@ -106,6 +127,21 @@ For all (v,a) find store of value v to address a.
 >               else m
 >       where m = computeStoreOf is
 
+For all load instructions, find the last value stored to that load's
+address on that load's thread.  (The local reads-from relation.)
+
+> computeLocalReadsFrom :: [Instr] -> M.Map InstrId Instr
+> computeLocalReadsFrom instrs = step instrs M.empty
+>   where
+>     step [] m = M.empty
+>     step (instr:instrs) m =
+>       case op instr of
+>         STORE -> step instrs (M.insert (tid instr, addr instr) instr m)
+>         LOAD  -> case M.lookup (tid instr, addr instr) m of
+>                    Nothing -> step instrs m
+>                    Just i  -> M.insert (uid instr) i (step instrs m)
+>         SYNC  -> step instrs m
+
 Lookup function for above mappings.
 
 > (!) :: (Show a, Ord a) => M.Map a b -> a -> b
@@ -123,6 +159,11 @@ Given an instruction trace, return a sub-trace for each thread.
 
 > threads :: [Instr] -> [[Instr]]
 > threads trace = [ [i | i <- trace, tid i == t] | t <- threadIds trace]
+
+Given an instruction trace, return all addresses used.
+
+> addrs :: [Instr] -> [Addr]
+> addrs = nub . map addr
 
 Instruction trace generators
 ============================
@@ -166,11 +207,12 @@ Random trace generator.
 >          let possible = local ++ [v | (t, v) <- stores, t /= threadId]
 >          v <- pick (if assumeLocalCO opts then possible else map snd stores)
 >          let instr = Instr {
->                        uid  = n
->                      , tid  = threadId
->                      , op   = LOAD
->                      , addr = a
->                      , val  = v
+>                        uid    = Id n
+>                      , tid    = threadId
+>                      , op     = LOAD
+>                      , addr   = a
+>                      , val    = v
+>                      , propTo = [0 .. totalThreads opts - 1]
 >                      }
 >          return (n+1, nsync, m, instr:instrs)
 >       where
@@ -183,11 +225,12 @@ Random trace generator.
 >            False ->
 >              do v <- pick vs
 >                 let instr = Instr {
->                               uid  = n
->                             , tid  = threadId
->                             , op   = STORE
->                             , addr = a
->                             , val  = v
+>                               uid    = Id n
+>                             , tid    = threadId
+>                             , op     = STORE
+>                             , addr   = a
+>                             , val    = v
+>                             , propTo = [0 .. totalThreads opts - 1]
 >                             }
 >                 let m' = M.insertWith (++) a [(threadId, v)] m
 >                 return $ Just (n+1, nsync, m', instr:instrs)
@@ -210,11 +253,12 @@ Random trace generator.
 >                            && n+2 <= totalInstrs opts
 >              sync <- pick [False, insertSync]
 >              let syncInstr = Instr {
->                                uid  = n
->                              , tid  = threadId
->                              , op   = SYNC
->                              , addr = error "addr SYNC = _|_"
->                              , val  = error "val SYNC = _|_"
+>                                uid    = Id n
+>                              , tid    = threadId
+>                              , op     = SYNC
+>                              , addr   = error "addr SYNC = _|_"
+>                              , val    = error "val SYNC = _|_"
+>                              , propTo = [0 .. totalThreads opts - 1]
 >                              }
 >              let state' = if   sync
 >                           then (n+1, nsync+1, m, syncInstr:instrs)
@@ -223,15 +267,16 @@ Random trace generator.
 
 Generator for small traces:
 
-> smallTraces :: Gen [[Instr]]
-> smallTraces =
->   genTrace $ TraceOptions {
->   --  totalInstrs   = 8
->   --, totalThreads  = 4
->     totalInstrs   = 8
->   , totalThreads  = 2
->   , maxVals       = 3
->   , maxAddrs      = 3
->   , maxSyncs      = 0
->   , assumeLocalCO = True
->   }
+> smallTraces :: Gen Trace
+> smallTraces = Trace <$> genTrace opts
+>   where 
+>     opts = TraceOptions {
+>              --  totalInstrs   = 8
+>              --, totalThreads  = 4 
+>                  totalInstrs   = 5
+>                , totalThreads  = 3
+>                , maxVals       = 2
+>                , maxAddrs      = 2
+>                , maxSyncs      = 0 
+>                , assumeLocalCO = True
+>            }

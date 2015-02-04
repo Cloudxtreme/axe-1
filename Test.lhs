@@ -15,20 +15,30 @@ Haskell platform imports
 > import Control.Applicative
 > import Debug.Trace
 
-Tests
-=====
+Equivalance tests between axiomatic and operational models
+==========================================================
 
-> numTestsIs :: Int -> Args
-> numTestsIs n = stdArgs { maxSuccess = n }
+> withNumTests :: Int -> Args
+> withNumTests n = stdArgs { maxSuccess = n }
+
+> testEquiv f g =
+>   forAll smallTraces $ \(Trace t) ->
+>     let a = f t
+>         b = g t
+>     in  classify a "true" $ a == b
 
 > testSC =
->   forAll smallTraces $ \t ->
->     let a = Axiomatic.SC.isSC t
->         b = Interleaving.isSC t
->     in classify a "true" $ a == b
+>   testEquiv Axiomatic.SC.isSC
+>             Interleaving.isSC
+
+> testSCMinusSA =
+>   testEquiv Axiomatic.SC.isSCMinusSA
+>             Interleaving.isSCMinusSA
 
 > testTSO =
->   forAll (Trace <$> smallTraces) $ \(Trace t) ->
->     let a = Axiomatic.TSO.isTSO t
->         b = Interleaving.isTSO t
->     in classify a "true" $ a == a
+>   testEquiv Axiomatic.TSO.isTSO
+>             Interleaving.isTSO
+
+> testTSOMinusSA =
+>   testEquiv Axiomatic.TSO.isTSOMinusSA
+>             Interleaving.isTSOMinusSA

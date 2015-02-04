@@ -3,5 +3,7 @@
 > import Test
 > import Test.QuickCheck
 
+> import Interleaving
+
 > main :: IO ()
-> main = quickCheckWith (numTestsIs 1000000) testTSO
+> main = quickCheckWith (withNumTests 1000000) testTSO

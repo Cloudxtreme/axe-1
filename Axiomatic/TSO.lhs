@@ -2,6 +2,7 @@
 
 > import Instr
 > import Constraint
+> import Axiomatic.RelaxSA
 > import qualified Data.Map as M
 
 Program-order edges
@@ -35,29 +36,26 @@ Reads-from and coherence edges
 > rfco trace = concatMap cons loads
 >   where
 >     loads = filter (\x -> op x == LOAD) (concat trace)
-> 
+>
 >     cons x
 >       | val x == Data 0 = [ uid x :-> uid s' | s' <- others ]
->       | otherwise       = [ uid s :-> uid x  | s <- extStore ]
->                        ++ [ p :-> uid s | p <- prev ]
+>                        ++ if not (null prev) then [ Fail ] else []
+>       | otherwise       = [ uid s :-> uid x  | tid s /= tid x ]
+>                        ++ [ p :-> uid s | p <- prev, tid s /= tid x ]
 >                        ++ [ (uid s' :-> uid s) :|:
 >                             (uid x  :-> uid s')
 >                           | s' <- others, uid s /= uid s' ]
->                        --   | s <- extStore, s' <- others, uid s /= uid s' ]
 >       where
->         s        = storeOf ! (val x, addr x)
->         extStore = [ s  | tid s /= tid x ]
->         stores   = [ s' | s' <- M.findWithDefault [] (addr x) storesTo ]
->         others   = [ s' | s' <- stores, tid s' /= tid x ]
->         prev     = case [ uid s' | s' <- stores
->                                  , tid s' == tid x
->                                  , uid s' < uid x
->                                  , uid s' /= uid s ] of
->                      [] -> []
->                      xs -> [maximum xs]
+>         s      = storeOf ! (val x, addr x)
+>         stores = [ s' | s' <- M.findWithDefault [] (addr x) storesTo]
+>         others = [ s' | s' <- stores, tid x /= tid s' ]
+>         prev   = case M.lookup (uid x) localRF of
+>                    Nothing -> []
+>                    Just p  -> [uid p]
 >
 >     storesTo = computeStoresTo (concat trace)
 >     storeOf  = computeStoreOf (concat trace)
+>     localRF  = computeLocalReadsFrom (concat trace)
 
 TSO constraints
 ===============
@@ -67,8 +65,14 @@ Given a trace, generate constraints for TSO.
 > constraintsTSO :: [[Instr]] -> [Constraint]
 > constraintsTSO = po \/ rfco
 
+> constraintsTSOMinusSA :: [[Instr]] -> [Constraint]
+> constraintsTSOMinusSA = relaxSA po rfco
+
 Solver
 ======
 
 > isTSO :: [[Instr]] -> Bool
 > isTSO = yices . constraintsTSO
+
+> isTSOMinusSA :: [[Instr]] -> Bool
+> isTSOMinusSA = yices . constraintsTSOMinusSA
