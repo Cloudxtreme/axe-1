@@ -12,15 +12,15 @@ Unique instruction identifiers
 ------------------------------
 
 Instruction IDs are typically integers, but sometimes it is useful to
-create several new unique IDs out of an existing one, hence the :::
-operator.
+create several new unique IDs out of an existing one, hence the Tag
+constructor.
 
 > data InstrId =
 >     Id Int
 >   | Tag InstrId Int
 >   deriving (Eq, Ord)
 
-As a shorthand for the tag constructor
+As a shorthand for the tag constructor:
 
 > infixl 5 #
 > (#) :: InstrId -> Int -> InstrId
@@ -42,6 +42,10 @@ Opcodes
 
 Addresses
 ---------
+
+When relaxing Store Atomicity, every thread has its own view of
+memory.  It can be handy to map simple integer addresses to pairs
+containing an integer address and the thread who can see this address.
 
 > data Addr =
 >     Addr Int
