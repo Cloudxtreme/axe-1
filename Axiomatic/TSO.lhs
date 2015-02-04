@@ -29,11 +29,11 @@ Program-order edges
 >                     ++ [uid s :-> me | s <- store]
 >                     ++ thread [] [] [instr] instrs
 
-Reads-from and coherence edges
-==============================
+Reads-from and write-order edges
+================================
 
-> rfco :: [[Instr]] -> [Constraint]
-> rfco trace = concatMap cons loads
+> rfwo :: [[Instr]] -> [Constraint]
+> rfwo trace = concatMap cons loads
 >   where
 >     loads = filter (\x -> op x == LOAD) (concat trace)
 >
@@ -63,10 +63,10 @@ TSO constraints
 Given a trace, generate constraints for TSO.
 
 > constraintsTSO :: [[Instr]] -> [Constraint]
-> constraintsTSO = po \/ rfco
+> constraintsTSO = po \/ rfwo
 
 > constraintsTSOMinusSA :: [[Instr]] -> [Constraint]
-> constraintsTSOMinusSA = relaxSA po rfco
+> constraintsTSOMinusSA = relaxSA po rfwo
 
 Solver
 ======
