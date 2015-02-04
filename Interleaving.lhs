@@ -88,11 +88,11 @@ Total Store Order (TSO)
 >         seen = addr x `elem` map addr stores
 >         prev = take 1 [val s | s <- stores, addr s == addr x]
 
-Non Store-Atomic (-SA)
-======================
+Relax Store-Atomicity
+=====================
 
-> notSA :: Next Instr -> [[Instr]] -> Bool
-> notSA next = any coherent . filter valid . ilv (propagate . next)
+> relaxSA :: Next Instr -> [[Instr]] -> Bool
+> relaxSA next = any coherent . filter valid . ilv (propagate . next)
 
 > propagate :: [(Instr, [Instr])] -> [(Instr, [Instr])]
 > propagate = concatMap prop
@@ -142,128 +142,10 @@ Sequential Consistency minus Store Atomicity (SC-SA)
 ====================================================
 
 > isSCMinusSA :: [[Instr]] -> Bool
-> isSCMinusSA = notSA scNext
+> isSCMinusSA = relaxSA scNext
 
 Total Store Order minus Store Atomicity (TSO-SA)
 ================================================
 
 > isTSOMinusSA :: [[Instr]] -> Bool
-> isTSOMinusSA = notSA tsoNext
-
-
-
-
-===
-Old
-===
-
-> {-
-> isTSOMinusSA :: [[Instr]] -> Bool
-> isTSOMinusSA = any valid . ilv tsoNextNonSA
->
-> tsoNextNonSA :: Next Instr
-> tsoNextNonSA (x:xs)
->   | op x == STORE = [(x `on` t, (x `seenBy` t) ++ xs) | t <- propTo x]
->                --  ++ next [x] xs
->   | otherwise     = [(x `on` tid x, xs)]
->   where
->     next stores []     = []
->     next stores (x:xs) =
->       case op x of
->         STORE -> next (x:stores) xs
->         LOAD  -> if   not seen
->                  then [(x `on` tid x, reverse stores ++ xs)]
->                  else if   prev == [val x]
->                       then next stores xs
->                       else []
->         SYNC  -> []
->       where
->         seen = addr x `elem` map addr stores
->         prev = take 1 [val s | s <- stores, addr s == addr x]
->
-> instr `on` t =
->   instr { addr = case addr instr of Addr a -> a :@ t }
->
-> instr `seenBy` t
->   | null propTo' = []
->   | otherwise    = [instr { propTo = propTo' }]
->   where propTo'  = delete t (propTo instr)
-> -}
-
-
-
-Validity in the absence of Store Atomicity.
-
-> {-
-> validNonSA :: [Instr] -> Bool
-> validNonSA instrs = step instrs visibleTo
->   where
->     tids      = threadIds instrs
->     as        = addrs instrs
->     visibleTo = M.fromList [ (t, [(a, Data 0) | a <- as]) | t <- tids ]
->
->     step [] vis = True
->     step (instr:instrs) vis =
->       let (t, a, v) = (tid instr, addr instr, val instr) in
->         case op instr of
->           LOAD ->
->             if   lookup a (vis ! t) == Just v
->             then step instrs vis
->             else let vis' = propagate (a, v) t vis
->                  in  if   lookup a (vis' ! t) == Just v
->                      then step instrs vis'
->                      else False
->           STORE ->
->             let vis' = M.insertWith (++) t [(a, v)] vis
->             in  step instrs vis'
->           SYNC  -> step instrs vis -- TODO: more
->
->     prop (a, v) from to vis =
->       case break (== (a, v)) (vis ! from) of
->         (pre, w:post) -> takeWhile (`notElem` (vis ! to)) (w:post)
->         other         -> []
->
->     propagate (a, v) to vis = M.insertWith (++) to new vis
->       where
->         new = concat [ prop (a, v) from to vis
->                      | from <- tids, from /= to]
-> -}
-
-> {-
-> validNonSA :: [Instr] -> Bool
-> validNonSA instrs = step instrs writesBy visibleTo
->   where
->     tids      = threadIds instrs
->     as        = addrs instrs
->     writesBy  = M.fromList [ (t, []) | t <- tids ]
->     visibleTo = M.fromList [ (t, [(a, Data 0) | a <- as]) | t <- tids ]
->
->     step [] ws vis = True
->     step (instr:instrs) ws vis =
->       let (t, a, v) = (tid instr, addr instr, val instr) in
->         case op instr of
->           LOAD ->
->             if   lookup a (vis ! t) == Just v
->             then step instrs ws vis
->             else let vis' = propagate (a, v) t ws vis
->                  in  if   lookup a (vis' ! t) == Just v
->                      then step instrs ws vis'
->                      else False
->           STORE ->
->             let ws'  = M.insertWith (++) t [(a, v)] ws
->                 vis' = M.insertWith (++) t [(a, v)] vis
->             in  step instrs ws' vis'
->           SYNC  -> step instrs ws vis -- TODO: more
->
->     prop (a, v) from to ws vis =
->       case break (== (a, v)) (ws ! from) of
->         (pre, w:post) -> takeWhile (`notElem` (vis ! to)) (w:post)
->         other         -> []
->
->     propagate (a, v) to ws vis = M.insertWith (++) to new vis
->       where
->         new = concat [ prop (a, v) from to ws vis
->                      | from <- tids, from /= to]
-> -}
-
-
+> isTSOMinusSA = relaxSA tsoNext
