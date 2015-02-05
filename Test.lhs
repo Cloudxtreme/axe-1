@@ -13,7 +13,7 @@ Haskell platform imports
 
 > import Test.QuickCheck
 > import Control.Applicative
-> import Debug.Trace
+> import Models
 
 Equivalance tests between axiomatic and operational models
 ==========================================================
@@ -27,18 +27,13 @@ Equivalance tests between axiomatic and operational models
 >         b = g t
 >     in  classify a "true" $ a == b
 
-> testSC =
->   testEquiv Axiomatic.SC.isSC
->             Interleaving.isSC
-
-> testSCMinusSA =
->   testEquiv Axiomatic.SC.isSCMinusSA
->             Interleaving.isSCMinusSA
-
-> testTSO =
->   testEquiv Axiomatic.TSO.isTSO
->             Interleaving.isTSO
-
-> testTSOMinusSA =
->   testEquiv Axiomatic.TSO.isTSOMinusSA
->             Interleaving.isTSOMinusSA
+> test model =
+>   case model of
+>     SA SC     -> testEquiv Axiomatic.SC.isSC
+>                            Interleaving.isSC
+>     NonSA SC  -> testEquiv Axiomatic.SC.isSCMinusSA
+>                            Interleaving.isSCMinusSA
+>     SA TSO    -> testEquiv Axiomatic.TSO.isTSO
+>                            Interleaving.isTSO
+>     NonSA TSO -> testEquiv Axiomatic.TSO.isTSOMinusSA
+>                            Interleaving.isTSOMinusSA
