@@ -6,6 +6,7 @@ Imports
 > import Instr
 > import qualified Axiomatic.SC
 > import qualified Axiomatic.TSO
+> import qualified Axiomatic.PSO
 > import qualified Data.Map as M
 
 Models
@@ -22,6 +23,7 @@ The base models are:
 > data BaseModel = 
 >     SC
 >   | TSO
+>   | PSO
 
 Function to display a model:
 
@@ -30,6 +32,8 @@ Function to display a model:
 >   show (NonSA SC)  = "sc-sa"
 >   show (SA    TSO) = "tso"
 >   show (NonSA TSO) = "tso-sa"
+>   show (SA    PSO) = "pso"
+>   show (NonSA PSO) = "pso-sa"
 
 Function to parse a model.
 
@@ -40,6 +44,8 @@ Function to parse a model.
 >     "sc-sa"  -> NonSA SC
 >     "tso"    -> SA TSO
 >     "tso-sa" -> NonSA TSO
+>     "pso"    -> SA PSO
+>     "pso-sa" -> NonSA PSO
 >     other    -> error $ "Unknown model '" ++ s ++ "'"
 
 Check if a trace satisfies a given model.
@@ -52,6 +58,8 @@ Check if a trace satisfies a given model.
 >            NonSA SC  -> Axiomatic.SC.isSCMinusSA trace
 >            SA TSO    -> Axiomatic.TSO.isTSO trace
 >            NonSA TSO -> Axiomatic.TSO.isTSOMinusSA trace
+>            SA PSO    -> Axiomatic.PSO.isPSO trace
+>            NonSA PSO -> Axiomatic.PSO.isPSOMinusSA trace
 
 Local-consistency
 =================

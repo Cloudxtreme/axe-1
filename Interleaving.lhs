@@ -88,6 +88,30 @@ Total Store Order (TSO)
 >         seen = addr x `elem` map addr stores
 >         prev = take 1 [val s | s <- stores, addr s == addr x]
 
+Partial Store Order (PSO)
+========================
+
+> isPSO :: [[Instr]] -> Bool
+> isPSO = any valid . ilv psoNext
+
+> psoNext :: Next Instr
+> psoNext (x:xs) = [(x, xs)] ++ if op x == STORE then next [x] xs else []
+>   where
+>     next stores []     = []
+>     next stores (x:xs) =
+>       case op x of
+>         STORE -> [(x, reverse stores ++ xs) | not seen]
+>               ++ next (x:stores) xs
+>         LOAD  -> if   not seen
+>                  then [(x, reverse stores ++ xs)]
+>                  else if   prev == [val x]
+>                       then next stores xs
+>                       else []
+>         SYNC  -> []
+>       where
+>         seen = addr x `elem` map addr stores
+>         prev = take 1 [val s | s <- stores, addr s == addr x]
+
 Relax Store-Atomicity
 =====================
 
@@ -149,3 +173,9 @@ Total Store Order minus Store Atomicity (TSO-SA)
 
 > isTSOMinusSA :: [[Instr]] -> Bool
 > isTSOMinusSA = relaxSA tsoNext
+
+Partial Store Order minus Store Atomicity (PSO-SA)
+==================================================
+
+> isPSOMinusSA :: [[Instr]] -> Bool
+> isPSOMinusSA = relaxSA psoNext
