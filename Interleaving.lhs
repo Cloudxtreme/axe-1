@@ -78,14 +78,13 @@ Total Store Order (TSO)
 >     next stores (x:xs) =
 >       case op x of
 >         STORE -> next (x:stores) xs
->         LOAD  -> if   not seen
+>         LOAD  -> if   null prev
 >                  then [(x, reverse stores ++ xs)]
 >                  else if   prev == [val x]
 >                       then next stores xs
 >                       else []
 >         SYNC  -> []
 >       where
->         seen = addr x `elem` map addr stores
 >         prev = take 1 [val s | s <- stores, addr s == addr x]
 
 Partial Store Order (PSO)
@@ -100,16 +99,15 @@ Partial Store Order (PSO)
 >     next stores []     = []
 >     next stores (x:xs) =
 >       case op x of
->         STORE -> [(x, reverse stores ++ xs) | not seen]
+>         STORE -> [(x, reverse stores ++ xs) | null prev]
 >               ++ next (x:stores) xs
->         LOAD  -> if   not seen
+>         LOAD  -> if   null prev
 >                  then [(x, reverse stores ++ xs)]
 >                  else if   prev == [val x]
 >                       then next stores xs
 >                       else []
 >         SYNC  -> []
 >       where
->         seen = addr x `elem` map addr stores
 >         prev = take 1 [val s | s <- stores, addr s == addr x]
 
 Relax Store-Atomicity
