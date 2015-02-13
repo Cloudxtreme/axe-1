@@ -1,4 +1,4 @@
-> module Axiomatic.PSO where
+> module Axiomatic.RMO where
 
 > import Instr
 > import Constraint
@@ -9,28 +9,31 @@ Program-order edges
 ===================
 
 > po :: [[Instr]] -> [Constraint]
-> po = concatMap (thread M.empty [] [])
+> po = concatMap (thread M.empty M.empty [])
 >   where
->     thread stores load sync instrs =
+>     thread stores loads sync instrs =
 >       case instrs of
 >         []           -> []
 >         instr:instrs ->
 >           let me = uid instr in
 >             case op instr of
->               LOAD  -> [uid s :-> me | s <- sync, null load]
->                     ++ [uid l :-> me | l <- load]
->                     ++ thread stores [instr] [] instrs
->               STORE -> [uid s :-> me | s <- sync, null load && null prev]
->                     ++ [uid l :-> me | l <- load]
->                     ++ [uid s :-> me | s <- prev]
->                     ++ thread stores' load sync instrs
->                        where
->                          prev    = M.findWithDefault [] (addr instr) stores
->                          stores' = M.insert (addr instr) [instr] stores
->               SYNC  -> [uid s :-> me | s <- sync, null load]
->                     ++ [uid l :-> me | l <- load]
+>               LOAD  -> [uid s :-> me | s <- sync]
+>                     ++ thread stores loads' sync instrs
+>                     where
+>                        loads' = M.insertWith (++) (addr instr) [instr] loads
+>               STORE -> [uid s :-> me | s <- sync, null prevS]
+>                     ++ [uid l :-> me | l <- prevL]
+>                     ++ [uid s :-> me | s <- prevS]
+>                     ++ thread stores' loads' sync instrs
+>                     where
+>                        prevS   = M.findWithDefault [] (addr instr) stores
+>                        prevL   = M.findWithDefault [] (addr instr) loads
+>                        stores' = M.insert (addr instr) [instr] stores
+>                        loads'  = M.insert (addr instr) [] loads
+>               SYNC  -> [uid s :-> me | s <- sync]
+>                     ++ [uid l :-> me | l <- concat (M.elems loads)]
 >                     ++ [uid s :-> me | s <- concat (M.elems stores)]
->                     ++ thread M.empty [] [instr] instrs
+>                     ++ thread M.empty M.empty [instr] instrs
 
 Reads-from and write-order edges
 ================================
@@ -65,17 +68,17 @@ TSO constraints
 
 Given a trace, generate constraints for TSO.
 
-> constraintsPSO :: [[Instr]] -> [Constraint]
-> constraintsPSO = po \/ rfwo
+> constraintsRMO :: [[Instr]] -> [Constraint]
+> constraintsRMO = po \/ rfwo
 
-> constraintsPSOMinusSA :: [[Instr]] -> [Constraint]
-> constraintsPSOMinusSA = relaxSA po rfwo
+> constraintsRMOMinusSA :: [[Instr]] -> [Constraint]
+> constraintsRMOMinusSA = relaxSA po rfwo
 
 Solver
 ======
 
-> isPSO :: [[Instr]] -> Bool
-> isPSO = yices . constraintsPSO
+> isRMO :: [[Instr]] -> Bool
+> isRMO = yices . constraintsRMO
 
-> isPSOMinusSA :: [[Instr]] -> Bool
-> isPSOMinusSA = yices . constraintsPSOMinusSA
+> isRMOMinusSA :: [[Instr]] -> Bool
+> isRMOMinusSA = yices . constraintsRMOMinusSA

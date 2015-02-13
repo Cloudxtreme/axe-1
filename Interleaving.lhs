@@ -110,6 +110,30 @@ Partial Store Order (PSO)
 >       where
 >         prev = take 1 [val s | s <- stores, addr s == addr x]
 
+Relaxed Memory Order (RMO)
+==========================
+
+> isRMO :: [[Instr]] -> Bool
+> isRMO = any valid . ilv rmoNext
+
+> rmoNext :: Next Instr
+> rmoNext (x:xs) = next [] (x:xs)
+>   where
+>     next instrs []     = []
+>     next instrs (x:xs) =
+>       case op x of
+>         STORE -> [(x, reverse instrs ++ xs) | null prevS && null prevL]
+>               ++ next (x:instrs) xs
+>         LOAD  -> if   null prevS
+>                  then [(x, reverse instrs ++ xs)] ++ next (x:instrs) xs
+>                  else if   prevS == [val x]
+>                       then next instrs xs
+>                       else next (x:instrs) xs
+>         SYNC  -> []
+>       where
+>         prevS = take 1 [val i | i <- instrs, op i == STORE, addr i == addr x]
+>         prevL = take 1 [val i | i <- instrs, op i == LOAD, addr i == addr x]
+
 Relax Store-Atomicity
 =====================
 
@@ -177,3 +201,9 @@ Partial Store Order minus Store Atomicity (PSO-SA)
 
 > isPSOMinusSA :: [[Instr]] -> Bool
 > isPSOMinusSA = relaxSA psoNext
+
+Relaxed Memory Order minus Store Atomicity (RMO-SA)
+===================================================
+
+> isRMOMinusSA :: [[Instr]] -> Bool
+> isRMOMinusSA = relaxSA rmoNext

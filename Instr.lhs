@@ -176,13 +176,13 @@ The desired properties of the generated trace.
 
 > data TraceOptions =
 >   TraceOptions {
->     totalInstrs   :: Int
->   , totalThreads  :: Int
->   , maxVals       :: Int
->   , maxAddrs      :: Int
->   , maxSyncs      :: Int
->   , assumeLocalCO :: Bool  -- Assume local coherence order
->   , onlySC        :: Bool  -- Only generate sequentially consistent traces
+>     totalInstrs     :: Int
+>   , totalThreads    :: Int
+>   , maxVals         :: Int
+>   , maxAddrs        :: Int
+>   , maxSyncs        :: Int
+>   , assumeLocalCons :: Bool  -- Assume local consistency
+>   , onlySC          :: Bool  -- Only generate sequentially consistent traces
 >   }
 
 The state of the generator is a tuple containing:
@@ -207,10 +207,10 @@ Random trace generator.
 >
 >     genLoad threadId (n, nsync, m, instrs) =
 >       do a <- Addr <$> choose (0, maxAddrs opts - 1)
->          let stores   = M.findWithDefault [] a m ++ [(threadId, Data 0)]
+>          let stores   = M.findWithDefault [] a m ++ (initial a)
 >          let local    = take 1 [v | (t, v) <- stores, t == threadId]
 >          let possible = local ++ [v | (t, v) <- stores, t /= threadId]
->          v <- pick (if assumeLocalCO opts then possible else map snd stores)
+>          v <- pick (if assumeLocalCons opts then possible else map snd stores)
 >          let instr = Instr {
 >                        uid    = Id n
 >                      , tid    = threadId
@@ -221,6 +221,12 @@ Random trace generator.
 >                      }
 >          return (n+1, nsync, m, instr:instrs)
 >       where
+>         initial a
+>           | assumeLocalCons opts =
+>               take 1 $ [(threadId, val i) | i <- instrs, op i == LOAD
+>                                           , tid i == threadId, addr i == a]
+>                     ++ [(threadId, Data 0)]
+>           | otherwise = [(threadId, Data 0)]
 >
 >     genStore threadId (n, nsync, m, instrs) =
 >       do a <- Addr <$> choose (0, maxAddrs opts - 1)
@@ -295,13 +301,13 @@ Generator for small traces.
 
 > smallTraceOpts = 
 >   TraceOptions {
->     totalInstrs   = 8
->   , totalThreads  = 4
->   , maxVals       = 3
->   , maxAddrs      = 3
->   , maxSyncs      = 0
->   , assumeLocalCO = True
->   , onlySC        = False
+>     totalInstrs     = 9
+>   , totalThreads    = 3
+>   , maxVals         = 3
+>   , maxAddrs        = 3
+>   , maxSyncs        = 0
+>   , assumeLocalCons = True
+>   , onlySC          = False
 >   }
 
 > smallTraces :: Gen Trace

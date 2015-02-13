@@ -17,14 +17,14 @@ Program-order edges
 >         instr:instrs ->
 >           let me = uid instr in
 >             case op instr of
->               LOAD  -> [uid s :-> me | s <- sync]
+>               LOAD  -> [uid s :-> me | s <- sync, null load]
 >                     ++ [uid l :-> me | l <- load]
->                     ++ thread store [instr] [] instrs
->               STORE -> [uid s :-> me | s <- sync]
+>                     ++ thread store [instr] sync instrs
+>               STORE -> [uid s :-> me | s <- sync, null load && null store]
 >                     ++ [uid l :-> me | l <- load]
 >                     ++ [uid s :-> me | s <- store]
 >                     ++ thread [instr] load sync instrs
->               SYNC  -> [uid s :-> me | s <- sync]
+>               SYNC  -> [uid s :-> me | s <- sync, null load && null store]
 >                     ++ [uid l :-> me | l <- load]
 >                     ++ [uid s :-> me | s <- store]
 >                     ++ thread [] [] [instr] instrs

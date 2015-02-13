@@ -7,7 +7,9 @@ Imports
 > import qualified Axiomatic.SC
 > import qualified Axiomatic.TSO
 > import qualified Axiomatic.PSO
+> import qualified Axiomatic.RMO
 > import qualified Data.Map as M
+> import Interleaving
 
 Models
 ======
@@ -24,6 +26,7 @@ The base models are:
 >     SC
 >   | TSO
 >   | PSO
+>   | RMO
 
 Function to display a model:
 
@@ -34,6 +37,8 @@ Function to display a model:
 >   show (NonSA TSO) = "tso-sa"
 >   show (SA    PSO) = "pso"
 >   show (NonSA PSO) = "pso-sa"
+>   show (SA    RMO) = "rmo"
+>   show (NonSA RMO) = "rmo-sa"
 
 Function to parse a model.
 
@@ -46,6 +51,8 @@ Function to parse a model.
 >     "tso-sa" -> NonSA TSO
 >     "pso"    -> SA PSO
 >     "pso-sa" -> NonSA PSO
+>     "rmo"    -> SA RMO
+>     "rmo-sa" -> NonSA RMO
 >     other    -> error $ "Unknown model '" ++ s ++ "'"
 
 Check if a trace satisfies a given model.
@@ -60,6 +67,8 @@ Check if a trace satisfies a given model.
 >            NonSA TSO -> Axiomatic.TSO.isTSOMinusSA trace
 >            SA PSO    -> Axiomatic.PSO.isPSO trace
 >            NonSA PSO -> Axiomatic.PSO.isPSOMinusSA trace
+>            SA RMO    -> Axiomatic.RMO.isRMO trace
+>            NonSA RMO -> Axiomatic.RMO.isRMOMinusSA trace
 
 Local-consistency
 =================
@@ -69,6 +78,9 @@ model:
 
   * Once a thread has written to an address, it can never again read
     the intial value from that address. 
+
+  * Once a thread has read a non-initial value from an address, it can 
+    never again read the intial value from that address.
 
   * If a variable is not shared then any reads of that variable must
     read the latest value written locally.
@@ -81,17 +93,19 @@ Traces from the random trace generator are always locally consistent,
 however externally-read traces may not be.
 
 > locallyConsistent :: [[Instr]] -> Bool
-> locallyConsistent trace = all (lc M.empty) trace
+> locallyConsistent trace = all (lc M.empty M.empty) trace
 >   where
 >     storesTo = computeStoresTo (concat trace)
 > 
->     lc m []= True
->     lc m (instr:instrs) =
+>     lc m r [] = True
+>     lc m r (instr:instrs) =
 >       case op instr of
->         LOAD  -> (  M.findWithDefault (Data 0) (addr instr) m == val instr
+>         LOAD  -> (  M.findWithDefault latest (addr instr) m == val instr
 >                  || val instr `elem` external )
->               && lc m instrs
->         STORE -> lc (M.insert (addr instr) (val instr) m) instrs
->         SYNC  -> lc m instrs
+>               && lc m r' instrs
+>         STORE -> lc (M.insert (addr instr) (val instr) m) r instrs
+>         SYNC  -> lc m r instrs
 >       where
 >         external = [val i | i <- storesTo ! addr instr, tid i /= tid instr]
+>         latest   = M.findWithDefault (Data 0) (tid instr, addr instr) r
+>         r'       = M.insert (tid instr, addr instr) (val instr) r

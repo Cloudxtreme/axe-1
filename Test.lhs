@@ -5,9 +5,11 @@ Local imports
 
 > import Instr
 > import qualified Interleaving
+> import qualified Spec
 > import qualified Axiomatic.SC
 > import qualified Axiomatic.TSO
 > import qualified Axiomatic.PSO
+> import qualified Axiomatic.RMO
 
 Haskell platform imports
 ========================
@@ -35,10 +37,14 @@ Equivalance tests between axiomatic and operational models
 >     NonSA SC  -> testEquiv Axiomatic.SC.isSCMinusSA
 >                            Interleaving.isSCMinusSA
 >     SA TSO    -> testEquiv Axiomatic.TSO.isTSO
->                            Interleaving.isTSO
+>                            Spec.isTSO
 >     NonSA TSO -> testEquiv Axiomatic.TSO.isTSOMinusSA
 >                            Interleaving.isTSOMinusSA
 >     SA PSO    -> testEquiv Axiomatic.PSO.isPSO
->                            Interleaving.isPSO
+>                            Spec.isPSO
 >     NonSA PSO -> testEquiv Axiomatic.PSO.isPSOMinusSA
 >                            Interleaving.isPSOMinusSA
+>     SA RMO    -> testEquiv Axiomatic.RMO.isRMO
+>                            Spec.isRMO
+>     NonSA RMO -> testEquiv Axiomatic.RMO.isRMOMinusSA
+>                            Interleaving.isRMOMinusSA
