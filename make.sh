@@ -1,1 +1,1 @@
-ghc -O --make Main.lhs
+ghc -O --make Main.lhs -o Axe

@@ -7,6 +7,7 @@
 > import Parser
 > import System.Environment
 > import System.Console.GetOpt
+> import System.IO
 
 Command-line options
 ====================
@@ -18,6 +19,7 @@ Command-line options
 >   | Check String         -- Check that an input trace satisifies
 >                          -- the given model
 >   | InputFile String     -- File to read input trace from
+>   | Interactive String   -- Interactive mode using named model
 >   deriving Show
 
 > options :: [OptDescr Flag]
@@ -30,6 +32,8 @@ Command-line options
 >     "Check that input trace satisfies MODEL"
 >   , Option ['f'] ["input"] (ReqArg InputFile "FILE")
 >     "Read input trace from FILE"
+>   , Option ['i'] ["interactive"] (ReqArg Interactive "MODEL")
+>     "Interactive mode using MODEL"
 >   ]
 
 Main
@@ -44,10 +48,12 @@ Main
 
 > process :: [Flag] -> IO ()
 > process opts
->   | checkerMode = doCheck opts
->   | otherwise   = doEquivTest opts
+>   | checkerMode     = doCheck opts
+>   | interactiveMode = doInteractive (head [m | Interactive m <- opts]) []
+>   | otherwise       = doEquivTest opts
 >   where
->     checkerMode = not $ null [m | Check m <- opts]
+>     checkerMode     = not $ null [m | Check m <- opts]
+>     interactiveMode = not $ null [m | Interactive m <- opts]
 
 > doEquivTest :: [Flag] -> IO ()
 > doEquivTest opts =
@@ -62,12 +68,21 @@ Main
 > doCheck :: [Flag] -> IO ()
 > doCheck opts =
 >   do input <- if file == "stdin" then getContents else readFile file
->      check input
+>      checkTrace model input
 >   where
 >     model = head ([m | Check m <- opts] ++ ["sc"])
 >     file  = head ([m | InputFile m <- opts] ++ ["stdin"])
->
->     check input =
->       if   parseTrace input `satisfies` stringToModel model
->       then putStrLn ("YES: satisifies '" ++ model ++ "'")
->       else putStrLn ("NO: does not satisfy '" ++ model ++ "'")
+
+> checkTrace model input =
+>   if   parseTrace input `satisfies` stringToModel model
+>   then putStrLn "OK" >> hFlush stdout
+>   else putStrLn "NO" >> hFlush stdout
+
+> doInteractive :: String -> [String] -> IO ()
+> doInteractive model lines =
+>   do line <- getLine
+>      case line of
+>        "exit"  -> return ()
+>        "check" -> checkTrace model (concat $ reverse lines)
+>                >> doInteractive model []
+>        other   -> doInteractive model ((line ++ "\n") : lines)

@@ -1,4 +1,4 @@
-> module Parser (parseTrace) where
+> module Parser (parseTrace, parseInstr) where
 
 Parser for instruction traces.  The format of traces is illustrated by
 the following example.
@@ -46,6 +46,9 @@ Natural numbers
 
 Instructions
 ============
+
+> parseInstr :: Parser Instr
+> parseInstr = instr
 
 > unset :: a
 > unset = error "Undefined field in Instr record"
