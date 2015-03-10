@@ -3,6 +3,7 @@
 > import Instr
 > import Data.List
 > import System.Process
+> import System.IO
 > import System.IO.Unsafe
 > import Debug.Trace
 
@@ -57,7 +58,7 @@ Check constraints using Yices.
 
 > yicesCheck :: [Constraint] -> IO Bool
 > yicesCheck cs =
->   do out <- readProcess "yices" [] (toYices cs)
+>   do out <- myReadProcess "yices" [] (toYices cs)
 >      return $ if   take 3 out == "sat"
 >               then True
 >               else (if   take 5 out == "unsat"
@@ -69,3 +70,32 @@ Pure vesion of the above for convenience in property-testing.
 > {-# NOINLINE yices #-} 
 > yices :: [Constraint] -> Bool
 > yices cs = unsafePerformIO (yicesCheck cs)
+
+Customised version of 'System.Process.readProcess'
+==================================================
+
+This one doesn't echo standard error.
+
+> myReadProcess :: FilePath -> [String] -> String -> IO String
+> myReadProcess name args input =
+>   do (Just stdIn, Just stdOut, Just stdErr, h) <- createProcess p
+>      hSetBuffering stdIn NoBuffering
+>      hSetBuffering stdOut NoBuffering
+>      hPutStr stdIn input
+>      line <- hGetLine stdOut
+>      hClose stdIn
+>      hClose stdOut
+>      hClose stdErr
+>      return line
+>   where
+>     p = CreateProcess {
+>           cmdspec       = RawCommand name args
+>         , cwd           = Nothing
+>         , env           = Nothing
+>         , std_in        = CreatePipe
+>         , std_out       = CreatePipe
+>         , std_err       = CreatePipe
+>         , close_fds     = True
+>         , create_group  = False
+>       --, delegate_ctlc = True
+>         }
