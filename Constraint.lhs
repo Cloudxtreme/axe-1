@@ -34,6 +34,7 @@ Convert constraint to Yices format.
 >      varDecls
 >   ++ unlines (map assert cs)
 >   ++ "(check)\n"
+>   ++ "(exit)\n"
 >   where
 >     var v = "v" ++ show v
 >
