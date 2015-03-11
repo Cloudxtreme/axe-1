@@ -87,6 +87,7 @@ This one doesn't echo standard error.
 >      hClose stdIn
 >      hClose stdOut
 >      hClose stdErr
+>      waitForProcess h
 >      return line
 >   where
 >     p = CreateProcess {
