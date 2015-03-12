@@ -84,6 +84,7 @@ Instructions
 > sync :: ThreadId -> Parser Instr
 > sync t =
 >   do string "sync"
+>      spaces
 >      return $ Instr {
 >        uid    = unset
 >      , tid    = t
