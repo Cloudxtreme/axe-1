@@ -5,6 +5,7 @@
 > import System.Process
 > import System.IO
 > import System.IO.Unsafe
+> import Data.IORef
 > import Debug.Trace
 
 Types
@@ -18,6 +19,11 @@ Types
 
 Combinators
 ===========
+
+Shorthand for expressing dependencies between instructions.
+
+> (-->) :: Instr -> Instr -> Constraint
+> x --> y = uid x :-> uid y
 
 Union two list generators, useful for unioning constraint sets.
 
@@ -59,7 +65,10 @@ Check constraints using Yices.
 
 > yicesCheck :: [Constraint] -> IO Bool
 > yicesCheck cs =
->   do out <- myReadProcess "yices" [] (toYices cs)
+>   do v <- readIORef verboseMode
+>      let s = toYices cs
+>      if v then putStrLn s else return ()
+>      out <- myReadProcess "yices" [] s
 >      return $ if   take 3 out == "sat"
 >               then True
 >               else (if   take 5 out == "unsat"
@@ -101,3 +110,10 @@ This one doesn't echo standard error.
 >         , create_group  = False
 >       --, delegate_ctlc = True
 >         }
+
+Global variable controlling verbosity
+=====================================
+
+> {-# NOINLINE verboseMode #-} 
+> verboseMode :: IORef Bool
+> verboseMode = unsafePerformIO (newIORef False)

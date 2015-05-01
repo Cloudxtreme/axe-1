@@ -8,6 +8,8 @@
 > import System.Environment
 > import System.Console.GetOpt
 > import System.IO
+> import Constraint
+> import Data.IORef
 
 Command-line options
 ====================
@@ -20,6 +22,8 @@ Command-line options
 >                          -- the given model
 >   | InputFile String     -- File to read input trace from
 >   | Interactive String   -- Interactive mode using named model
+>   | Verbose              -- Show generated constraints
+>   | Reference            -- Use reference implementation
 >   deriving Show
 
 > options :: [OptDescr Flag]
@@ -34,6 +38,10 @@ Command-line options
 >     "Read input trace from FILE"
 >   , Option ['i'] ["interactive"] (ReqArg Interactive "MODEL")
 >     "Interactive mode using MODEL"
+>   , Option ['v'] ["verbose"] (NoArg Verbose)
+>     "Show generated constraints"
+>   , Option ['r'] ["reference"] (NoArg Reference)
+>     "Use reference implementation"
 >   ]
 
 Main
@@ -43,13 +51,16 @@ Main
 > main =
 >   do args <- getArgs
 >      case getOpt Permute options args of
->        (o, [], []) -> process o
+>        (o, [], []) -> do let v = not $ null [() | Verbose <- o]
+>                          writeIORef verboseMode v
+>                          process o
 >        (_,_,errs)  -> putStrLn $ usageInfo "Usage info:" options
 
 > process :: [Flag] -> IO ()
 > process opts
 >   | checkerMode     = doCheck opts
 >   | interactiveMode = doInteractive (head [m | Interactive m <- opts]) []
+>                                     (not $ null [() | Reference <- opts])
 >   | otherwise       = doEquivTest opts
 >   where
 >     checkerMode     = not $ null [m | Check m <- opts]
@@ -68,21 +79,23 @@ Main
 > doCheck :: [Flag] -> IO ()
 > doCheck opts =
 >   do input <- if file == "stdin" then getContents else readFile file
->      checkTrace model input
+>      checkTrace model input refMode
 >   where
->     model = head ([m | Check m <- opts] ++ ["sc"])
->     file  = head ([m | InputFile m <- opts] ++ ["stdin"])
+>     model   = head ([m | Check m <- opts] ++ ["sc"])
+>     file    = head ([m | InputFile m <- opts] ++ ["stdin"])
+>     refMode = not $ null [() | Reference <- opts]
 
-> checkTrace model input =
->   if   parseTrace input `satisfies` stringToModel model
+> checkTrace model input refMode =
+>   if   parseTrace input `sat` stringToModel model
 >   then putStrLn "OK" >> hFlush stdout
 >   else putStrLn "NO" >> hFlush stdout
+>   where sat = if refMode then satisfiesRef else satisfies
 
-> doInteractive :: String -> [String] -> IO ()
-> doInteractive model lines =
+> doInteractive :: String -> [String] -> Bool -> IO ()
+> doInteractive model lines refMode =
 >   do line <- getLine
 >      case line of
 >        "exit"  -> return ()
->        "check" -> checkTrace model (concat $ reverse lines)
->                >> doInteractive model []
->        other   -> doInteractive model ((line ++ "\n") : lines)
+>        "check" -> checkTrace model (concat $ reverse lines) refMode
+>                >> doInteractive model [] refMode
+>        other   -> doInteractive model ((line ++ "\n") : lines) refMode

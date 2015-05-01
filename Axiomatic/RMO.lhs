@@ -13,27 +13,26 @@ Program-order edges
 >   where
 >     thread stores loads sync instrs =
 >       case instrs of
->         []           -> []
->         instr:instrs ->
->           let me = uid instr in
->             case op instr of
->               LOAD  -> [uid s :-> me | s <- sync]
+>         []        -> []
+>         me:instrs ->
+>             case op me of
+>               LOAD  -> [s --> me | s <- sync]
 >                     ++ thread stores loads' sync instrs
 >                     where
->                        loads' = M.insertWith (++) (addr instr) [instr] loads
->               STORE -> [uid s :-> me | s <- sync, null prevS]
->                     ++ [uid l :-> me | l <- prevL]
->                     ++ [uid s :-> me | s <- prevS]
+>                        loads' = M.insertWith (++) (addr me) [me] loads
+>               STORE -> [s --> me | s <- sync, null prevS]
+>                     ++ [l --> me | l <- prevL]
+>                     ++ [s --> me | s <- prevS]
 >                     ++ thread stores' loads' sync instrs
 >                     where
->                        prevS   = M.findWithDefault [] (addr instr) stores
->                        prevL   = M.findWithDefault [] (addr instr) loads
->                        stores' = M.insert (addr instr) [instr] stores
->                        loads'  = M.insert (addr instr) [] loads
->               SYNC  -> [uid s :-> me | s <- sync]
->                     ++ [uid l :-> me | l <- concat (M.elems loads)]
->                     ++ [uid s :-> me | s <- concat (M.elems stores)]
->                     ++ thread M.empty M.empty [instr] instrs
+>                        prevS   = M.findWithDefault [] (addr me) stores
+>                        prevL   = M.findWithDefault [] (addr me) loads
+>                        stores' = M.insert (addr me) [me] stores
+>                        loads'  = M.insert (addr me) [] loads
+>               SYNC  -> [s --> me | s <- sync]
+>                     ++ [l --> me | l <- concat (M.elems loads)]
+>                     ++ [s --> me | s <- concat (M.elems stores)]
+>                     ++ thread M.empty M.empty [me] instrs
 
 Reads-from and write-order edges
 ================================
@@ -44,20 +43,20 @@ Reads-from and write-order edges
 >     loads = filter (\x -> op x == LOAD) (concat trace)
 >
 >     cons x
->       | val x == Data 0 = [ uid x :-> uid s' | s' <- others ]
+>       | val x == Data 0 = [ x --> s' | s' <- others ]
 >                        ++ if not (null prev) then [ Fail ] else []
->       | otherwise       = [ uid s :-> uid x  | tid s /= tid x ]
->                        ++ [ p :-> uid s | p <- prev, tid s /= tid x ]
->                        ++ [ (uid s' :-> uid s) :|:
->                             (uid x  :-> uid s')
+>       | otherwise       = [ s --> x  | tid s /= tid x ]
+>                        ++ [ p --> s | p <- prev, tid s /= tid x ]
+>                        ++ [ (s' --> s) :|:
+>                             (x  --> s')
 >                           | s' <- others, uid s /= uid s' ]
 >       where
 >         s      = storeOf ! (val x, addr x)
->         stores = [ s' | s' <- M.findWithDefault [] (addr x) storesTo]
+>         stores = M.findWithDefault [] (addr x) storesTo
 >         others = [ s' | s' <- stores, tid x /= tid s' ]
 >         prev   = case M.lookup (uid x) localRF of
 >                    Nothing -> []
->                    Just p  -> [uid p]
+>                    Just p  -> [p]
 >
 >     storesTo = computeStoresTo (concat trace)
 >     storeOf  = computeStoreOf (concat trace)

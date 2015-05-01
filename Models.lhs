@@ -9,7 +9,8 @@ Imports
 > import qualified Axiomatic.PSO
 > import qualified Axiomatic.RMO
 > import qualified Data.Map as M
-> import Interleaving
+> import qualified Interleaving as Interleaving
+> import qualified Spec as Spec
 
 Models
 ======
@@ -55,7 +56,7 @@ Function to parse a model.
 >     "rmo-sa" -> NonSA RMO
 >     other    -> error $ "Unknown model '" ++ s ++ "'"
 
-Check if a trace satisfies a given model.
+Check if a trace satisfies a given constraint model.
 
 > satisfies :: [[Instr]] -> Model -> Bool
 > satisfies trace model = locallyConsistent trace && ok
@@ -69,6 +70,21 @@ Check if a trace satisfies a given model.
 >            NonSA PSO -> Axiomatic.PSO.isPSOMinusSA trace
 >            SA RMO    -> Axiomatic.RMO.isRMO trace
 >            NonSA RMO -> Axiomatic.RMO.isRMOMinusSA trace
+
+Check if a trace satisfies a given reference model.
+
+> satisfiesRef :: [[Instr]] -> Model -> Bool
+> satisfiesRef trace model = locallyConsistent trace && ok
+>   where
+>     ok = case model of
+>            SA SC     -> Interleaving.isSC trace
+>            NonSA SC  -> Interleaving.isSCMinusSA trace
+>            SA TSO    -> Spec.isTSO trace
+>            NonSA TSO -> Interleaving.isTSOMinusSA trace
+>            SA PSO    -> Spec.isPSO trace
+>            NonSA PSO -> Interleaving.isPSOMinusSA trace
+>            SA RMO    -> Spec.isRMO trace
+>            NonSA RMO -> Interleaving.isRMOMinusSA trace
 
 Local-consistency
 =================
