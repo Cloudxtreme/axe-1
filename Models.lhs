@@ -4,12 +4,8 @@ Imports
 =======
 
 > import Instr
-> import qualified Axiomatic.SC
-> import qualified Axiomatic.TSO
-> import qualified Axiomatic.PSO
-> import qualified Axiomatic.RMO
+> import qualified Axiomatic
 > import qualified Data.Map as M
-> import qualified Interleaving as Interleaving
 > import qualified Spec as Spec
 > import qualified Operational
 
@@ -19,12 +15,6 @@ Models
 Each model has a Store Atomic and Non Store Atomic variant.
 
 > data Model =
->     SA    BaseModel
->   | NonSA BaseModel
-
-The base models are:
-
-> data BaseModel = 
 >     SC
 >   | TSO
 >   | PSO
@@ -33,28 +23,20 @@ The base models are:
 Function to display a model:
 
 > instance Show Model where
->   show (SA    SC)  = "sc"
->   show (NonSA SC)  = "sc-sa"
->   show (SA    TSO) = "tso"
->   show (NonSA TSO) = "tso-sa"
->   show (SA    PSO) = "pso"
->   show (NonSA PSO) = "pso-sa"
->   show (SA    RMO) = "rmo"
->   show (NonSA RMO) = "rmo-sa"
+>   show SC  = "sc"
+>   show TSO = "tso"
+>   show PSO = "pso"
+>   show RMO = "rmo"
 
 Function to parse a model.
 
 > stringToModel :: String -> Model
 > stringToModel s =
 >   case s of
->     "sc"     -> SA SC
->     "sc-sa"  -> NonSA SC
->     "tso"    -> SA TSO
->     "tso-sa" -> NonSA TSO
->     "pso"    -> SA PSO
->     "pso-sa" -> NonSA PSO
->     "rmo"    -> SA RMO
->     "rmo-sa" -> NonSA RMO
+>     "sc"     -> SC
+>     "tso"    -> TSO
+>     "pso"    -> PSO
+>     "rmo"    -> RMO
 >     other    -> error $ "Unknown model '" ++ s ++ "'"
 
 Check if a trace satisfies a given constraint model.
@@ -63,14 +45,10 @@ Check if a trace satisfies a given constraint model.
 > satisfies trace model = locallyConsistent trace && ok
 >   where
 >     ok = case model of
->            SA SC     -> Axiomatic.SC.isSC trace
->            NonSA SC  -> Axiomatic.SC.isSCMinusSA trace
->            SA TSO    -> Axiomatic.TSO.isTSO trace
->            NonSA TSO -> Axiomatic.TSO.isTSOMinusSA trace
->            SA PSO    -> Axiomatic.PSO.isPSO trace
->            NonSA PSO -> Axiomatic.PSO.isPSOMinusSA trace
->            SA RMO    -> Axiomatic.RMO.isRMO trace
->            NonSA RMO -> Axiomatic.RMO.isRMOMinusSA trace
+>            SC  -> Axiomatic.isSC trace
+>            TSO -> Axiomatic.isTSO trace
+>            PSO -> Axiomatic.isPSO trace
+>            RMO -> Axiomatic.isRMO trace
 
 Check if a trace satisfies a given reference model.
 
@@ -78,14 +56,10 @@ Check if a trace satisfies a given reference model.
 > satisfiesRef trace model = locallyConsistent trace && ok
 >   where
 >     ok = case model of
->            SA SC     -> Operational.isSC trace
->            NonSA SC  -> Interleaving.isSCMinusSA trace
->            SA TSO    -> Operational.isTSO trace
->            NonSA TSO -> Interleaving.isTSOMinusSA trace
->            SA PSO    -> Operational.isPSO trace
->            NonSA PSO -> Interleaving.isPSOMinusSA trace
->            SA RMO    -> Operational.isRMO trace
->            NonSA RMO -> Interleaving.isRMOMinusSA trace
+>            SC  -> Operational.isSC trace
+>            TSO -> Operational.isTSO trace
+>            PSO -> Operational.isPSO trace
+>            RMO -> Operational.isRMO trace
 
 Local-consistency
 =================

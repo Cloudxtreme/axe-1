@@ -1,4 +1,4 @@
-Specifications of each memory model
+Specifications of each memory model from the SPARC manual
 
 > module Spec where
 
@@ -7,6 +7,7 @@ Specifications of each memory model
 > import qualified Data.Set as S
 > import Data.List (union)
 > import Data.Maybe
+> import qualified ProgramOrder as PO
 
 Intruction dependence graphs
 ============================
@@ -120,95 +121,27 @@ Program Order edges
 > (-->) :: a -> b -> (a, b)
 > a --> b = (a, b)
 
+> edge (x, y) = uid x --> uid y
+
 Sequential Consistency.
 
 > poSC :: [[Instr]] -> Graph
-> poSC trace = graph trace (concatMap thread trace)
->   where
->     thread []       = []
->     thread [x]      = []
->     thread (x:y:zs) = (uid x, uid y) : thread (y:zs)
+> poSC trace = graph trace (map edge $ PO.poSC trace)
 
 Total Store Order.
 
 > poTSO :: [[Instr]] -> Graph
-> poTSO trace =
->   graph trace (concatMap (thread [] [] []) trace)
->   where
->     thread store load sync instrs =
->       case instrs of
->         []           -> []
->         instr:instrs ->
->           let me = uid instr in
->             case op instr of
->               LOAD  -> [uid s --> me | s <- sync, null load]
->                     ++ [uid l --> me | l <- load]
->                     ++ thread store [instr] sync instrs
->               STORE -> [uid s --> me | s <- sync, null load && null store]
->                     ++ [uid l --> me | l <- load]
->                     ++ [uid s --> me | s <- store]
->                     ++ thread [instr] load sync instrs
->               SYNC  -> [uid s --> me | s <- sync, null load && null store]
->                     ++ [uid l --> me | l <- load]
->                     ++ [uid s --> me | s <- store]
->                     ++ thread [] [] [instr] instrs
+> poTSO trace = graph trace (map edge $ PO.poTSO trace)
 
 Partial Store Order.
 
 > poPSO :: [[Instr]] -> Graph
-> poPSO trace =
->   graph trace (concatMap (thread M.empty [] []) trace)
->   where
->     thread stores load sync instrs =
->       case instrs of
->         []           -> []
->         instr:instrs ->
->           let me = uid instr in
->             case op instr of
->               LOAD  -> [uid s --> me | s <- sync, null load]
->                     ++ [uid l --> me | l <- load]
->                     ++ thread stores [instr] sync instrs
->               STORE -> [uid s --> me | s <- sync, null load && null prev]
->                     ++ [uid l --> me | l <- load]
->                     ++ [uid s --> me | s <- prev]
->                     ++ thread stores' load sync instrs
->                        where
->                          prev    = M.findWithDefault [] (addr instr) stores
->                          stores' = M.insert (addr instr) [instr] stores
->               SYNC  -> [uid s --> me | s <- sync, null load]
->                     ++ [uid l --> me | l <- load]
->                     ++ [uid s --> me | s <- concat (M.elems stores)]
->                     ++ thread M.empty [] [instr] instrs
+> poPSO trace =  graph trace (map edge $ PO.poPSO trace)
 
 Relaxed Memory Order.
 
 > poRMO :: [[Instr]] -> Graph
-> poRMO trace =
->   graph trace (concatMap (thread M.empty M.empty []) trace)
->   where
->     thread stores loads sync instrs =
->       case instrs of
->         []           -> []
->         instr:instrs ->
->           let me = uid instr in
->             case op instr of
->               LOAD  -> [uid s --> me | s <- sync]
->                     ++ thread stores loads' sync instrs
->                     where
->                        loads' = M.insertWith (++) (addr instr) [instr] loads
->               STORE -> [uid s --> me | s <- sync, null prevS]
->                     ++ [uid l --> me | l <- prevL]
->                     ++ [uid s --> me | s <- prevS]
->                     ++ thread stores' loads' sync instrs
->                     where
->                        prevS   = M.findWithDefault [] (addr instr) stores
->                        prevL   = M.findWithDefault [] (addr instr) loads
->                        stores' = M.insert (addr instr) [instr] stores
->                        loads'  = M.insert (addr instr) [] loads
->               SYNC  -> [uid s --> me | s <- sync]
->                     ++ [uid l --> me | l <- concat (M.elems loads)]
->                     ++ [uid s --> me | s <- concat (M.elems stores)]
->                     ++ thread M.empty M.empty [instr] instrs
+> poRMO trace = graph trace (map edge $ PO.poRMO trace)
 
 Store buffer edges.  For each load, find the previous store to the
 same address in program order.  If the value stored differs from the

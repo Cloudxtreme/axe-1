@@ -11,20 +11,8 @@ Syntax of instruction traces
 Unique instruction identifiers
 ------------------------------
 
-Instruction IDs are typically integers, but sometimes it is useful to
-create several new unique IDs out of an existing one, hence the Tag
-constructor.
-
-> data InstrId =
->     Id Int
->   | Tag InstrId Int
+> data InstrId = Id Int
 >   deriving (Eq, Ord)
-
-As a shorthand for the tag constructor:
-
-> infixl 5 #
-> (#) :: InstrId -> Int -> InstrId
-> x # y = Tag x y
 
 Thread identifiers
 ------------------
@@ -43,13 +31,7 @@ Opcodes
 Addresses
 ---------
 
-When relaxing Store Atomicity, every thread has its own view of
-memory.  It can be handy to map simple integer addresses to pairs
-containing an integer address and the thread who can see this address.
-
-> data Addr =
->     Addr Int
->   | Addr :@ ThreadId
+> data Addr = Addr Int
 >   deriving (Eq, Ord)
 
 Data
@@ -72,7 +54,6 @@ In the case of SYNC, the address and data fields are unused.
 >   , op     :: Opcode
 >   , addr   :: Addr
 >   , val    :: Data
->   , propTo :: [ThreadId]
 >   }
 
 Pretty printer
@@ -82,11 +63,9 @@ Pretty printer
 
 > instance Show InstrId where
 >   show (Id a) = show a
->   show (Tag x y) = show x ++ "_" ++ show y
 
 > instance Show Addr where
 >   show (Addr a) = show a
->   show (a:@t) = show a ++ "@" ++ show t
 
 > instance Show Data where
 >   show (Data d) = show d
@@ -98,7 +77,7 @@ Pretty printer
 >         case op instr of
 >           LOAD  -> "v" ++ show (addr instr) ++ " == " ++ show (val instr)
 >           STORE -> "v" ++ show (addr instr) ++ " := " ++ show (val instr)
->           SYNC  -> "SYNC"
+>           SYNC  -> "sync"
 
 > instance Show Trace where
 >   show (Trace t) = helper t
@@ -201,7 +180,7 @@ The state of the generator is a tuple containing:
 Random trace generator.
 
 > genTrace :: TraceOptions -> Gen [[Instr]]
-> genTrace opts = (prunePropTo . threads) <$> step initialState
+> genTrace opts = threads <$> step initialState
 >   where
 >     pick xs = oneof (map return xs)
 >
@@ -217,7 +196,6 @@ Random trace generator.
 >                      , op     = LOAD
 >                      , addr   = a
 >                      , val    = if onlySC opts then snd (head stores) else v
->                      , propTo = [0 .. totalThreads opts - 1]
 >                      }
 >          return (n+1, nsync, m, instr:instrs)
 >       where
@@ -241,7 +219,6 @@ Random trace generator.
 >                             , op     = STORE
 >                             , addr   = a
 >                             , val    = v
->                             , propTo = [0 .. totalThreads opts - 1]
 >                             }
 >                 let m' = M.insertWith (++) a [(threadId, v)] m
 >                 return $ Just (n+1, nsync, m', instr:instrs)
@@ -272,30 +249,11 @@ Random trace generator.
 >                              , op     = SYNC
 >                              , addr   = error "addr SYNC = _|_"
 >                              , val    = error "val SYNC = _|_"
->                              , propTo = [0 .. totalThreads opts - 1]
 >                              }
 >              let state' = if   sync
 >                           then (n+1, nsync+1, m, syncInstr:instrs)
 >                           else (n, nsync, m, instrs)
 >              genLoadOrStore threadId state' >>= step
-
-The 'propTo' field of a store instruction contains all the thread ids
-that the write must be propagated to.  Initially, this is just the
-list of all thread ids in the program.  For improved performance, we
-prune the list so that it contains only threads that read from the
-address of the write.
-
-> prunePropTo :: [[Instr]] -> [[Instr]]
-> prunePropTo trace =
->   [ [ if   op i == STORE
->       then i { propTo = M.findWithDefault [tid i] (addr i) m }
->       else i
->     | i <- is ]
->   | is <- trace
->   ]
->   where
->     loads = [(addr i, [tid i]) | i <- concat trace, op i == LOAD ]
->     m     = foldr (\(a, ts) -> M.insertWith union a ts) M.empty loads
 
 Generator for small traces.
 

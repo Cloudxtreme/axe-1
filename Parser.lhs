@@ -79,7 +79,6 @@ Instructions
 >      , op     = o
 >      , addr   = Addr a
 >      , val    = Data v
->      , propTo = unset
 >      }
 
 > sync :: ThreadId -> Parser Instr
@@ -92,7 +91,6 @@ Instructions
 >      , op     = SYNC
 >      , addr   = unset
 >      , val    = unset
->      , propTo = unset
 >      }
 
 > operator :: Parser Opcode
@@ -106,15 +104,13 @@ Traces
 > trace =
 >   do instrs <- many instr
 >      eof
->      return (prunePropTo $ threads $ sanityCheck $ augment instrs)
+>      return (threads $ sanityCheck $ augment instrs)
 >   where
 >     augment instrs = aug 0 instrs
 >       where
->         tids = threadIds instrs
->
 >         aug n [] = []
 >         aug n (instr:instrs) =
->           instr { uid = Id n, propTo = tids } : aug (n+1) instrs
+>           instr { uid = Id n } : aug (n+1) instrs
 
 Parser
 ======

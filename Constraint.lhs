@@ -20,7 +20,7 @@ Types
 Combinators
 ===========
 
-Shorthand for expressing dependencies between instructions.
+Construct happens-before constraint between two instructions.
 
 > (-->) :: Instr -> Instr -> Constraint
 > x --> y = uid x :-> uid y

@@ -3,7 +3,6 @@
 > import Test
 > import Test.QuickCheck
 > import Models
-> import Interleaving
 > import Parser
 > import System.Environment
 > import System.Console.GetOpt
