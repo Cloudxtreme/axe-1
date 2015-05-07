@@ -10,6 +10,7 @@ Local imports
 > import qualified Axiomatic.TSO
 > import qualified Axiomatic.PSO
 > import qualified Axiomatic.RMO
+> import qualified Operational
 
 Haskell platform imports
 ========================
@@ -33,18 +34,18 @@ Equivalance tests between axiomatic and operational models
 > test model =
 >   case model of
 >     SA SC     -> testEquiv Axiomatic.SC.isSC
->                            Interleaving.isSC
+>                            Operational.isSC
 >     NonSA SC  -> testEquiv Axiomatic.SC.isSCMinusSA
 >                            Interleaving.isSCMinusSA
 >     SA TSO    -> testEquiv Axiomatic.TSO.isTSO
->                            Spec.isTSO
+>                            Operational.isTSO
 >     NonSA TSO -> testEquiv Axiomatic.TSO.isTSOMinusSA
 >                            Interleaving.isTSOMinusSA
 >     SA PSO    -> testEquiv Axiomatic.PSO.isPSO
->                            Spec.isPSO
+>                            Operational.isPSO
 >     NonSA PSO -> testEquiv Axiomatic.PSO.isPSOMinusSA
 >                            Interleaving.isPSOMinusSA
 >     SA RMO    -> testEquiv Axiomatic.RMO.isRMO
->                            Spec.isRMO
+>                            Operational.isRMO
 >     NonSA RMO -> testEquiv Axiomatic.RMO.isRMOMinusSA
 >                            Interleaving.isRMOMinusSA

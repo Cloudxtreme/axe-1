@@ -4,11 +4,12 @@ Parser for instruction traces.  The format of traces is illustrated by
 the following example.
 
   0: v1 := 1
+  0: sync
   0: v0 == 0
   1: v0 := 1
   1: v1 == 0
 
-This trace contains four instructions, the first two run on thread 0
+This trace contains five instructions, the first three run on thread 0
 and the second two run on thread 1, i.e. the thread id preceeds the
 ':' character.  It contains two variables v0 and v1.  All variables
 reside in shared memory.  The ':=' operator denotes a store of a value

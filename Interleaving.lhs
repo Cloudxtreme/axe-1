@@ -117,7 +117,7 @@ Relaxed Memory Order (RMO)
 > isRMO = any valid . ilv rmoNext
 
 > rmoNext :: Next Instr
-> rmoNext (x:xs) = next [] (x:xs)
+> rmoNext (x:xs) = [(x, xs)] ++ if op x /= SYNC then next [x] xs else []
 >   where
 >     next instrs []     = []
 >     next instrs (x:xs) =

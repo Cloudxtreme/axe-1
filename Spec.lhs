@@ -33,7 +33,7 @@ Empty set of edges.
 >    , outgoing = M.empty
 >    }
 
-All desitinations from a vertex.
+All destinations from a vertex.
 
 > from :: Ord a => a -> Edges a -> [a]
 > from x es = M.findWithDefault [] x (outgoing es)

@@ -11,6 +11,7 @@ Imports
 > import qualified Data.Map as M
 > import qualified Interleaving as Interleaving
 > import qualified Spec as Spec
+> import qualified Operational
 
 Models
 ======
@@ -77,13 +78,13 @@ Check if a trace satisfies a given reference model.
 > satisfiesRef trace model = locallyConsistent trace && ok
 >   where
 >     ok = case model of
->            SA SC     -> Interleaving.isSC trace
+>            SA SC     -> Operational.isSC trace
 >            NonSA SC  -> Interleaving.isSCMinusSA trace
->            SA TSO    -> Spec.isTSO trace
+>            SA TSO    -> Operational.isTSO trace
 >            NonSA TSO -> Interleaving.isTSOMinusSA trace
->            SA PSO    -> Spec.isPSO trace
+>            SA PSO    -> Operational.isPSO trace
 >            NonSA PSO -> Interleaving.isPSOMinusSA trace
->            SA RMO    -> Spec.isRMO trace
+>            SA RMO    -> Operational.isRMO trace
 >            NonSA RMO -> Interleaving.isRMOMinusSA trace
 
 Local-consistency

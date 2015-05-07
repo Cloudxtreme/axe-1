@@ -59,10 +59,10 @@ Reads-from and write-order edges
 >     storeOf  = computeStoreOf (concat trace)
 >     localRF  = computeLocalReadsFrom (concat trace)
 
-TSO constraints
+PSO constraints
 ===============
 
-Given a trace, generate constraints for TSO.
+Given a trace, generate constraints for PSO.
 
 > constraintsPSO :: [[Instr]] -> [Constraint]
 > constraintsPSO = po \/ rfwo

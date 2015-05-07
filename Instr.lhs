@@ -301,11 +301,11 @@ Generator for small traces.
 
 > smallTraceOpts = 
 >   TraceOptions {
->     totalInstrs     = 9
->   , totalThreads    = 3
+>     totalInstrs     = 8
+>   , totalThreads    = 2
 >   , maxVals         = 3
 >   , maxAddrs        = 3
->   , maxSyncs        = 0
+>   , maxSyncs        = 1
 >   , assumeLocalCons = True
 >   , onlySC          = False
 >   }
