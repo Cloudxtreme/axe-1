@@ -210,8 +210,8 @@ Memory Models
 > isSC = any (valid Nothing) . sorts . poSC
 
 > relaxed :: ([[Instr]] -> Graph) -> [[Instr]] -> Bool
-> relaxed po trace = any (valid (Just localRF)) $ sorts $ po trace
->   where localRF = computeLocalReadsFrom (concat trace)
+> relaxed po trace = any (valid (Just localStores)) $ sorts $ po trace
+>   where localStores = computePrevLocalStore (concat trace)
 
 > isTSO :: [[Instr]] -> Bool
 > isTSO = relaxed poTSO

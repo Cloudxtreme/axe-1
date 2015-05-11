@@ -52,7 +52,12 @@ Monadic routines:
 > fetchInstr t =
 >   do s <- getState
 >      case instrs s M.! t of
->        []   -> mzero
+>        [] -> mzero
+>        ld:st:is
+>          | op ld == LOAD  && atomic ld
+>         && op st == STORE && atomic st
+>         -> do putState (s { instrs = M.insert t is (instrs s) })
+>               return (ld { op = LLSC, val2 = val st })
 >        i:is -> do putState (s { instrs = M.insert t is (instrs s) })
 >                   return i
 
@@ -107,6 +112,13 @@ Monadic routines:
 >   do s <- getState
 >      putState (s { mem = M.insert a v (mem s) })
 
+> load :: (Addr, Data) -> Buffer -> ND ()
+> load (a, v) b =
+>   do s <- getState
+>      case lookupWrite a b of
+>        Nothing -> a `contains` v
+>        Just x  -> guard (x == v)
+
 > anyThreadId :: ND ThreadId
 > anyThreadId =
 >   do s <- getState
@@ -146,7 +158,7 @@ SC
 >      case op i of
 >        LOAD  -> addr i `contains` val i
 >        STORE -> writeMem (addr i, val i)
->        iYNC  -> return ()
+>        SYNC  -> return ()
 
 TSO
 ===
@@ -160,11 +172,12 @@ TSO
 >      i <- fetchInstr t
 >      b <- getBuffer t
 >      case op i of
->        LOAD  -> case lookupWrite (addr i) b of
->                   Nothing -> addr i `contains` val i
->                   Just x  -> guard (x == val i)
+>        LOAD  -> load (addr i, val i) b
 >        STORE -> setBuffer t (i:b)
 >        SYNC  -> guard (null b)
+>        LLSC  -> do guard (null b)
+>                    load (addr i, val i) []
+>                    writeMem (addr i, val2 i)
 
 > propagateTSO :: ND ()
 > propagateTSO =
@@ -176,7 +189,20 @@ PSO
 ===
 
 > isPSO :: [[Instr]] -> Bool
-> isPSO = run (fetchExecuteTSO `mplus` propagatePSO)
+> isPSO = run (fetchExecutePSO `mplus` propagatePSO)
+
+> fetchExecutePSO :: ND ()
+> fetchExecutePSO = 
+>   do t <- anyThreadId
+>      i <- fetchInstr t
+>      b <- getBuffer t
+>      case op i of
+>        LOAD  -> load (addr i, val i) b
+>        STORE -> setBuffer t (i:b)
+>        SYNC  -> guard (null b)
+>        LLSC  -> do guard (null [s | s <- b, addr s == addr i])
+>                    load (addr i, val i) b
+>                    writeMem (addr i, val2 i)
 
 > propagatePSO :: ND ()
 > propagatePSO =
@@ -196,16 +222,18 @@ RMO
 >      i <- fetchInstr t
 >      b <- getBuffer t
 >      case op i of
->        LOAD  -> setBuffer t (i:b)
->        STORE -> setBuffer t (i:b)
 >        SYNC  -> guard (null b)
+>        LLSC  -> do guard (null [s | s <- b, op s == STORE, addr s == addr i])
+>                    load (addr i, val i) b
+>                    writeMem (addr i, val2 i)
+>        _     -> setBuffer t (i:b)
 
 > propagateRMO :: ND ()
 > propagateRMO =
 >   do t <- anyThreadId
 >      (pre, i, post) <- extractBuffer' t
 >      case op i of
->        LOAD  -> case lookupWrite (addr i) post of
->                   Nothing -> addr i `contains` val i
->                   Just x  -> guard (x == val i)
+>        LOAD  -> load (addr i, val i) post
 >        STORE -> writeMem (addr i, val i)
+>        LLSC  -> load (addr i, val i) post
+>              >> writeMem (addr i, val2 i)

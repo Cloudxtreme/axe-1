@@ -26,6 +26,7 @@ Opcodes
 >     LOAD
 >   | STORE
 >   | SYNC
+>   | LLSC
 >   deriving (Eq, Show)
 
 Addresses
@@ -54,6 +55,8 @@ In the case of SYNC, the address and data fields are unused.
 >   , op     :: Opcode
 >   , addr   :: Addr
 >   , val    :: Data
+>   , atomic :: Bool
+>   , val2   :: Data
 >   }
 
 Pretty printer
@@ -75,8 +78,12 @@ Pretty printer
 >     where
 >       str =
 >         case op instr of
->           LOAD  -> "v" ++ show (addr instr) ++ " == " ++ show (val instr)
->           STORE -> "v" ++ show (addr instr) ++ " := " ++ show (val instr)
+>           LOAD  -> "v" ++ show (addr instr)
+>                 ++ (if atomic instr then " =={LL} " else " == ")
+>                 ++ show (val instr)
+>           STORE -> "v" ++ show (addr instr)
+>                 ++ (if atomic instr then " :={SC} " else " := ")
+>                 ++ show (val instr)
 >           SYNC  -> "sync"
 
 > instance Show Trace where
@@ -111,10 +118,10 @@ For all (v,a) find store of value v to address a.
 >       where m = computeStoreOf is
 
 For all load instructions, find the last value stored to that load's
-address on that load's thread.  (The local reads-from relation.)
+address on that load's thread.
 
-> computeLocalReadsFrom :: [Instr] -> M.Map InstrId Instr
-> computeLocalReadsFrom instrs = step instrs M.empty
+> computePrevLocalStore :: [Instr] -> M.Map InstrId Instr
+> computePrevLocalStore instrs = step instrs M.empty
 >   where
 >     step [] m = M.empty
 >     step (instr:instrs) m =
@@ -160,6 +167,7 @@ The desired properties of the generated trace.
 >   , maxVals         :: Int
 >   , maxAddrs        :: Int
 >   , maxSyncs        :: Int
+>   , maxLLSCs        :: Int
 >   , assumeLocalCons :: Bool  -- Assume local consistency
 >   , onlySC          :: Bool  -- Only generate sequentially consistent traces
 >   }
@@ -172,10 +180,10 @@ The state of the generator is a tuple containing:
     address and by which thread
   * a list of instructions generated so far
 
-> type GenState = (Int, Int, M.Map Addr [(ThreadId, Data)], [Instr])
+> type GenState = (Int, Int, Int, M.Map Addr [(ThreadId, Data)], [Instr])
 
 > initialState :: GenState
-> initialState = (0, 0, M.empty, [])
+> initialState = (0, 0, 0, M.empty, [])
 
 Random trace generator.
 
@@ -184,9 +192,8 @@ Random trace generator.
 >   where
 >     pick xs = oneof (map return xs)
 >
->     genLoad threadId (n, nsync, m, instrs) =
->       do a <- Addr <$> choose (0, maxAddrs opts - 1)
->          let stores   = M.findWithDefault [] a m ++ (initial a)
+>     genLoad ll threadId a (n, nsync, nllsc, m, instrs) =
+>       do let stores   = M.findWithDefault [] a m ++ (initial a)
 >          let local    = take 1 [v | (t, v) <- stores, t == threadId]
 >          let possible = local ++ [v | (t, v) <- stores, t /= threadId]
 >          v <- pick (if assumeLocalCons opts then possible else map snd stores)
@@ -196,8 +203,11 @@ Random trace generator.
 >                      , op     = LOAD
 >                      , addr   = a
 >                      , val    = if onlySC opts then snd (head stores) else v
+>                      , val2   = error "val2 not defined"
+>                      , atomic = ll
 >                      }
->          return (n+1, nsync, m, instr:instrs)
+>          let n' = if ll then n else n+1
+>          return (n', nsync, if ll then nllsc+1 else nllsc, m, instr:instrs)
 >       where
 >         initial a
 >           | assumeLocalCons opts =
@@ -206,9 +216,13 @@ Random trace generator.
 >                     ++ [(threadId, Data 0)]
 >           | otherwise = [(threadId, Data 0)]
 >
->     genStore threadId (n, nsync, m, instrs) =
->       do a <- Addr <$> choose (0, maxAddrs opts - 1)
->          let vs = dataVals \\ (map snd $ M.findWithDefault [] a m)
+>     possibleVals a m = dataVals \\ usedVals
+>       where
+>         dataVals = map Data [1 .. maxVals opts - 1]
+>         usedVals = map snd (M.findWithDefault [] a m)
+>
+>     genStore sc threadId a (n, nsync, nllsc, m, instrs) =
+>       do let vs = possibleVals a m
 >          case null vs of
 >            True -> return Nothing
 >            False ->
@@ -219,51 +233,75 @@ Random trace generator.
 >                             , op     = STORE
 >                             , addr   = a
 >                             , val    = v
+>                             , atomic = sc
+>                             , val2   = error "val2 not defined"
 >                             }
 >                 let m' = M.insertWith (++) a [(threadId, v)] m
->                 return $ Just (n+1, nsync, m', instr:instrs)
+>                 return $ Just (n+1, nsync, nllsc, m', instr:instrs)
 >       where
 >         dataVals = map Data [1 .. maxVals opts - 1]
 >
 >     genLoadOrStore threadId state =
->       do load <- genLoad threadId state
+>       do a <- Addr <$> choose (0, maxAddrs opts - 1)
+>          load <- genLoad False threadId a state
 >          b    <- pick [False, True]
 >          case b of
 >            True  -> return load
->            False -> do maybeStore <- genStore threadId state
+>            False -> do maybeStore <- genStore False threadId a state
 >                        case maybeStore of
 >                          Nothing -> return load
 >                          Just s  -> return s
 >
->     step state@(n, nsync, m, instrs)
+>     step state@(n, nsync, nllsc, m, instrs)
 >       | n == totalInstrs opts = return (reverse instrs)
 >       | otherwise =
 >           do threadId <- choose (0, totalThreads opts - 1)
+>
+>              -- Insert SYNC?
 >              let insertSync = not (null [i | i <- instrs, tid i == threadId])
 >                            && nsync < maxSyncs opts
 >                            && n+2 <= totalInstrs opts
->              sync <- pick [False, insertSync]
+>              let syncChance = totalInstrs opts `div` (2*(maxSyncs opts + 1))
+>              sync <- pick ([insertSync] ++ replicate syncChance False)
 >              let syncInstr = Instr {
 >                                uid    = Id n
 >                              , tid    = threadId
 >                              , op     = SYNC
 >                              , addr   = error "addr SYNC = _|_"
 >                              , val    = error "val SYNC = _|_"
+>                              , val2   = error "val2 not defined"
+>                              , atomic = False
 >                              }
->              let state' = if   sync
->                           then (n+1, nsync+1, m, syncInstr:instrs)
->                           else (n, nsync, m, instrs)
->              genLoadOrStore threadId state' >>= step
+>
+>              -- Insert LL/SC?
+>              a <- Addr <$> choose (0, maxAddrs opts - 1)
+>              let insertLLSC = not sync && nllsc < maxLLSCs opts
+>                            && n+1 <= totalInstrs opts
+>                            && not (null (possibleVals a m))
+>              let llscChance = totalInstrs opts `div` (2*(maxLLSCs opts + 1))
+>              llsc <- pick ([insertLLSC] ++ replicate llscChance False)
+>
+>              case llsc of
+>                True  ->
+>                  genLoad True threadId a state >>=
+>                    genStore True threadId a >>=
+>                      (\(Just s) -> step s)
+>                False ->
+>                  let state' = if   sync
+>                               then (n+1, nsync+1, nllsc, m, syncInstr:instrs)
+>                               else (n, nsync, nllsc, m, instrs)
+>                   in genLoadOrStore threadId state' >>= step
 
 Generator for small traces.
 
 > smallTraceOpts = 
 >   TraceOptions {
->     totalInstrs     = 8
+>     totalInstrs     = 7
 >   , totalThreads    = 2
 >   , maxVals         = 3
 >   , maxAddrs        = 3
->   , maxSyncs        = 1
+>   , maxSyncs        = 0
+>   , maxLLSCs        = 1
 >   , assumeLocalCons = True
 >   , onlySC          = False
 >   }

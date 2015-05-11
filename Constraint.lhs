@@ -6,13 +6,13 @@
 > import System.IO
 > import System.IO.Unsafe
 > import Data.IORef
-> import Debug.Trace
 
 Types
 =====
 
 > data Constraint =
 >     InstrId :-> InstrId
+>   | InstrId :== InstrId
 >   | Constraint :|: Constraint
 >   | Constraint :<=> Constraint
 >   | Fail
@@ -24,6 +24,11 @@ Construct happens-before constraint between two instructions.
 
 > (-->) :: Instr -> Instr -> Constraint
 > x --> y = uid x :-> uid y
+
+Happen at same time:
+
+> (===) :: Instr -> Instr -> Constraint
+> x === y = uid x :== uid y
 
 Union two list generators, useful for unioning constraint sets.
 
@@ -45,11 +50,13 @@ Convert constraint to Yices format.
 >     var v = "v" ++ show v
 >
 >     vars (x :-> y)  = [var x, var y]
+>     vars (x :== y)  = [var x, var y]
 >     vars (c :|: d)  = vars c ++ vars d
 >     vars (c :<=> d) = vars c ++ vars d
 >     vars Fail       = []
 >
 >     translate (x :-> y) = "(< " ++ var x ++ " " ++ var y ++ ")"
+>     translate (x :== y) = "(= " ++ var x ++ " " ++ var y ++ ")"
 >     translate (c :|: d) =
 >       "(or " ++ translate c ++ " " ++ translate d ++ ")"
 >     translate (c :<=> d) =

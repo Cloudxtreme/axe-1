@@ -97,6 +97,7 @@ however externally-read traces may not be.
 >         STORE -> lc (M.insert (addr instr) (val instr) m) r instrs
 >         SYNC  -> lc m r instrs
 >       where
->         external = [val i | i <- storesTo ! addr instr, tid i /= tid instr]
+>         external = [val i | i <- M.findWithDefault [] (addr instr) storesTo
+>                           , tid i /= tid instr]
 >         latest   = M.findWithDefault (Data 0) (tid instr, addr instr) r
 >         r'       = M.insert (tid instr, addr instr) (val instr) r

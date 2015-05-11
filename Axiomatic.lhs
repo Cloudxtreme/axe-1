@@ -86,13 +86,13 @@ Reads-from and write-order edges.
 >         s      = storeOf ! (val x, addr x)
 >         stores = M.findWithDefault [] (addr x) storesTo
 >         others = [ s' | s' <- stores, tid x /= tid s' ]
->         prev   = case M.lookup (uid x) localRF of
+>         prev   = case M.lookup (uid x) prevLocalStore of
 >                    Nothing -> []
 >                    Just p  -> [p]
 >
->     storesTo = computeStoresTo (concat trace)
->     storeOf  = computeStoreOf (concat trace)
->     localRF  = computeLocalReadsFrom (concat trace)
+>     storesTo       = computeStoresTo (concat trace)
+>     storeOf        = computeStoreOf (concat trace)
+>     prevLocalStore = computePrevLocalStore (concat trace)
 
 PSO constraints
 ===============
@@ -100,7 +100,7 @@ PSO constraints
 Given a trace, generate constraints for PSO.
 
 > constraintsPSO :: [[Instr]] -> [Constraint]
-> constraintsPSO = poPSO \/ rfwoTSO
+> constraintsPSO = poPSO \/ rfwoTSO 
 
 Program-order edges.
 
@@ -113,7 +113,7 @@ RMO constraints
 Given a trace, generate constraints for PSO.
 
 > constraintsRMO :: [[Instr]] -> [Constraint]
-> constraintsRMO = poRMO \/ rfwoTSO
+> constraintsRMO = poRMO \/ rfwoTSO 
 
 Program-order edges.
 

@@ -39,7 +39,7 @@ Total Store Order.
 >                     ++ [l --> me | l <- load]
 >                     ++ thread store [me] sync instrs
 >               STORE -> [s --> me | s <- sync, null load && null store]
->                     ++ [l --> me | l <- load]
+>                     ++ [l --> me | l <- load, uid l /= uid me]
 >                     ++ [s --> me | s <- store]
 >                     ++ thread [me] load sync instrs
 >               SYNC  -> [s --> me | s <- sync, null load && null store]
@@ -61,7 +61,7 @@ Partial Store Order.
 >                     ++ [l --> me | l <- load]
 >                     ++ thread stores [me] [] instrs
 >               STORE -> [s --> me | s <- sync, null load && null prev]
->                     ++ [l --> me | l <- load]
+>                     ++ [l --> me | l <- load, uid l /= uid me]
 >                     ++ [s --> me | s <- prev]
 >                     ++ thread stores' load sync instrs
 >                        where
@@ -87,7 +87,7 @@ Relaxed Memory Order.
 >                     where
 >                        loads' = M.insertWith (++) (addr me) [me] loads
 >               STORE -> [s --> me | s <- sync, null prevS]
->                     ++ [l --> me | l <- prevL]
+>                     ++ [l --> me | l <- prevL, uid l /= uid me]
 >                     ++ [s --> me | s <- prevS]
 >                     ++ thread stores' loads' sync instrs
 >                     where
