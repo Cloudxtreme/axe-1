@@ -159,6 +159,8 @@ SC
 >        LOAD  -> addr i `contains` val i
 >        STORE -> writeMem (addr i, val i)
 >        SYNC  -> return ()
+>        LLSC  -> addr i `contains` val i
+>              >> writeMem (addr i, val2 i)
 
 TSO
 ===

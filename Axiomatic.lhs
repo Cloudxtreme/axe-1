@@ -48,7 +48,8 @@ Reads-from and write-order edges
 >                            | s' <- others ]
 >       where
 >         s      = storeOf ! (val me, addr me)
->         stores = M.findWithDefault [] (addr me) storesTo
+>         stores = [ s  | s <- M.findWithDefault [] (addr me) storesTo
+>                       , uid s /= uid me ]
 >         others = [ s' | s' <- stores, uid s /= uid s' ]
 >
 >     storesTo = computeStoresTo (concat trace)

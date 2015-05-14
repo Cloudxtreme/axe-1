@@ -23,7 +23,7 @@ Sequential Consistency.
 >   where
 >     thread []       = []
 >     thread [x]      = []
->     thread (x:y:zs) = (x --> y) : thread (y:zs)
+>     thread (x:y:zs) = [x --> y | uid x /= uid y]  ++ thread (y:zs)
 
 Total Store Order.
 
