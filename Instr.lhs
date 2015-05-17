@@ -57,7 +57,18 @@ In the case of SYNC, the address and data fields are unused.
 >   , val    :: Data
 >   , atomic :: Bool
 >   , val2   :: Data
+>   , stamp  :: Timestamp
 >   }
+
+Timestamps
+==========
+
+A timestamp is a (start-time,end-time) pair:
+
+> type Timestamp = (Maybe Int, Maybe Int)
+
+> noStamp :: Timestamp
+> noStamp = (Nothing, Nothing)
 
 Pretty printer
 ==============
@@ -205,6 +216,7 @@ Random trace generator.
 >                      , val    = if onlySC opts then snd (head stores) else v
 >                      , val2   = error "val2 not defined"
 >                      , atomic = ll
+>                      , stamp  = noStamp
 >                      }
 >          let n' = if ll then n else n+1
 >          return (n', nsync, if ll then nllsc+1 else nllsc, m, instr:instrs)
@@ -235,6 +247,7 @@ Random trace generator.
 >                             , val    = v
 >                             , atomic = sc
 >                             , val2   = error "val2 not defined"
+>                             , stamp  = noStamp
 >                             }
 >                 let m' = M.insertWith (++) a [(threadId, v)] m
 >                 return $ Just (n+1, nsync, nllsc, m', instr:instrs)
@@ -270,6 +283,7 @@ Random trace generator.
 >                              , addr   = error "addr SYNC = _|_"
 >                              , val    = error "val SYNC = _|_"
 >                              , val2   = error "val2 not defined"
+>                              , stamp  = noStamp
 >                              , atomic = False
 >                              }
 >

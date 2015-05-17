@@ -8,13 +8,24 @@ the following example.
   0: v0 == 0
   1: v0 := 1
   1: v1 == 0
+  1: { v1 == 0 ; v1 := 2 }
 
 This trace contains five instructions, the first three run on thread 0
 and the second two run on thread 1, i.e. the thread id preceeds the
 ':' character.  It contains two variables v0 and v1.  All variables
 reside in shared memory.  The ':=' operator denotes a store of a value
 to a variable and '==' denotes a load from a variable the results in
-the given value.
+the given value.  The '{' and '}' brackets denote an atomic
+read-modify-write operation (the variable in the read and the write
+must be the same).
+
+Any instruction may also contain a timestamp annotation, e.g.
+
+  0: v1 := 1 @ 5
+  1: v0 == 0 @ 10-15
+
+Th first line is a store that started at time 5.  The second line is a
+load that started at time 10 and completed at time 15.
 
 Haskell platform imports
 ========================
@@ -65,7 +76,11 @@ Instructions
 >              <|> ((:[]) `fmap` loadOrStore operator t)
 >              <|> ((:[]) `fmap` sync t)
 >      spaces
->      return i
+>      ts <- timestamp
+>      spaces
+>      return (map (addStamp ts) i)
+>  where
+>    addStamp ts i = i { stamp = ts }
 
 > atomicLoadStore :: ThreadId -> Parser [Instr]
 > atomicLoadStore t =
@@ -100,6 +115,7 @@ Instructions
 >           , val    = Data v
 >           , atomic = False
 >           , val2   = unset
+>           , stamp  = noStamp
 >           }
 
 > address :: Parser Int
@@ -114,13 +130,14 @@ Instructions
 >      spaces
 >      return $
 >        Instr {
->          uid    = unset
->        , tid    = t
->        , op     = SYNC
->        , addr   = unset
->        , val    = unset
->        , atomic = False
->        , val2   = unset
+>          uid     = unset
+>        , tid     = t
+>        , op      = SYNC
+>        , addr    = unset
+>        , val     = unset
+>        , atomic  = False
+>        , val2    = unset
+>        , stamp   = noStamp
 >        }
 
 > operator :: Parser Opcode
@@ -131,6 +148,18 @@ Instructions
 
 > opStore :: Parser Opcode
 > opStore = string ":=" >> return STORE
+
+> timestamp :: Parser Timestamp
+> timestamp = 
+>   do ts <- optionMaybe $
+>              do string "@"
+>                 spaces
+>                 start <- natural
+>                 stop <- optionMaybe $ (string "-" >> natural)
+>                 return (Just start, stop)
+>      case ts of
+>        Nothing -> return noStamp
+>        Just x  -> return x
 
 Traces
 ======
