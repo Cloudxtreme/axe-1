@@ -8,6 +8,7 @@
 > import System.Console.GetOpt
 > import System.IO
 > import Constraint
+> import Logger
 > import Data.IORef
 
 Command-line options
@@ -22,7 +23,8 @@ Command-line options
 >   | InputFile String     -- File to read input trace from
 >   | Interactive String   -- Interactive mode using named model
 >   | Verbose              -- Show generated constraints
->   | Reference            -- Use reference implementation
+>   | Operational          -- Use operational variant of model
+>   | Log String           -- Enable logging to a file
 >   deriving Show
 
 > options :: [OptDescr Flag]
@@ -39,8 +41,10 @@ Command-line options
 >     "Interactive mode using MODEL"
 >   , Option ['v'] ["verbose"] (NoArg Verbose)
 >     "Show generated constraints"
->   , Option ['r'] ["reference"] (NoArg Reference)
->     "Use reference implementation"
+>   , Option ['o'] ["operational"] (NoArg Operational)
+>     "Use operational variant of model"
+>   , Option ['l'] ["log"] (ReqArg Log "FILE")
+>     "Enable logging to a file"
 >   ]
 
 Main
@@ -52,18 +56,28 @@ Main
 >      case getOpt Permute options args of
 >        (o, [], []) -> do let v = not $ null [() | Verbose <- o]
 >                          writeIORef verboseMode v
+>                          enableLogging o
 >                          process o
->        (_,_,errs)  -> putStrLn $ usageInfo "Usage info:" options
+>        (_,_,errs)  ->
+>          do putStrLn $ usageInfo "Usage info:" options
+>             putStrLn "  where MODEL is one of SC, TSO, PSO, or RMO"
 
 > process :: [Flag] -> IO ()
 > process opts
 >   | checkerMode     = doCheck opts
 >   | interactiveMode = doInteractive (head [m | Interactive m <- opts]) []
->                                     (not $ null [() | Reference <- opts])
+>                                     (not $ null [() | Operational <- opts])
 >   | otherwise       = doEquivTest opts
 >   where
 >     checkerMode     = not $ null [m | Check m <- opts]
 >     interactiveMode = not $ null [m | Interactive m <- opts]
+
+> enableLogging :: [Flag] -> IO ()
+> enableLogging opts = 
+>   case [s | Log s <- opts] of
+>     []  -> return ()
+>     s:_ -> do writeFile s ""
+>               writeIORef loggingMode (Just s)
 
 > doEquivTest :: [Flag] -> IO ()
 > doEquivTest opts =
@@ -82,13 +96,13 @@ Main
 >   where
 >     model   = head ([m | Check m <- opts] ++ ["sc"])
 >     file    = head ([m | InputFile m <- opts] ++ ["stdin"])
->     refMode = not $ null [() | Reference <- opts]
+>     refMode = not $ null [() | Operational <- opts]
 
 > checkTrace model input refMode =
 >   if   parseTrace input `sat` stringToModel model
 >   then putStrLn "OK" >> hFlush stdout
 >   else putStrLn "NO" >> hFlush stdout
->   where sat = if refMode then satisfiesRef else satisfies
+>   where sat = if refMode then satisfiesOperational else satisfies
 
 > doInteractive :: String -> [String] -> Bool -> IO ()
 > doInteractive model lines refMode =

@@ -8,6 +8,7 @@ Imports
 > import qualified Data.Map as M
 > import qualified Spec as Spec
 > import qualified Operational
+> import Data.Char
 
 Models
 ======
@@ -32,7 +33,7 @@ Function to parse a model.
 
 > stringToModel :: String -> Model
 > stringToModel s =
->   case s of
+>   case map toLower s of
 >     "sc"     -> SC
 >     "tso"    -> TSO
 >     "pso"    -> PSO
@@ -50,10 +51,10 @@ Check if a trace satisfies a given constraint model.
 >            PSO -> Axiomatic.isPSO trace
 >            RMO -> Axiomatic.isRMO trace
 
-Check if a trace satisfies a given reference model.
+Check if a trace satisfies a given operational model.
 
-> satisfiesRef :: [[Instr]] -> Model -> Bool
-> satisfiesRef trace model = locallyConsistent trace && ok
+> satisfiesOperational :: [[Instr]] -> Model -> Bool
+> satisfiesOperational trace model = locallyConsistent trace && ok
 >   where
 >     ok = case model of
 >            SC  -> Operational.isSC trace

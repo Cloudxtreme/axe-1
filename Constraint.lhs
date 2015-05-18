@@ -6,6 +6,7 @@
 > import System.IO
 > import System.IO.Unsafe
 > import Data.IORef
+> import Logger
 
 Types
 =====
@@ -86,7 +87,7 @@ Pure vesion of the above for convenience in property-testing.
 
 > {-# NOINLINE yices #-} 
 > yices :: [Constraint] -> Bool
-> yices cs = unsafePerformIO (yicesCheck cs)
+> yices cs = unsafePerformIO (logger (yicesCheck cs))
 
 Customised version of 'System.Process.readProcess'
 ==================================================
