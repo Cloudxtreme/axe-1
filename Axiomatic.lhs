@@ -20,58 +20,11 @@ Solvers
 > isRMO :: [[Instr]] -> Bool
 > isRMO = yices . constraintsRMO
 
-SC constraints
-==============
-
-Given a trace, generate constraints for sequential consistency.
-
-> constraintsSC :: [[Instr]] -> [Constraint]
-> constraintsSC = poSC \/ rfwoSC
-
-Program-order edges.
-
-> poSC :: [[Instr]] -> [Constraint]
-> poSC = map constraint . PO.poSC
-
 Reads-from and write-order edges
+================================
 
-> rfwoSC :: [[Instr]] -> [Constraint]
-> rfwoSC trace = concatMap cons loads
->   where
->     loads = filter (\x -> op x == LOAD) (concat trace)
-> 
->     cons me
->       | val me == Data 0 = [ me --> s' | s' <- stores ]
->       | otherwise        = [ s --> me ]
->                         ++ [ (s' --> s ) :|:
->                              (me --> s')
->                            | s' <- others ]
->       where
->         s      = storeOf ! (val me, addr me)
->         stores = [ s  | s <- M.findWithDefault [] (addr me) storesTo
->                       , uid s /= uid me ]
->         others = [ s' | s' <- stores, uid s /= uid s' ]
->
->     storesTo = computeStoresTo (concat trace)
->     storeOf  = computeStoreOf (concat trace)
-
-TSO constraints
-===============
-
-Given a trace, generate constraints for TSO.
-
-> constraintsTSO :: [[Instr]] -> [Constraint]
-> constraintsTSO = poTSO \/ rfwoTSO
-
-Program-order edges.
-
-> poTSO :: [[Instr]] -> [Constraint]
-> poTSO = map constraint . PO.poTSO
-
-Reads-from and write-order edges.
-
-> rfwoTSO :: [[Instr]] -> [Constraint]
-> rfwoTSO trace = concatMap cons loads
+> rfwo :: [[Instr]] -> [Constraint]
+> rfwo trace = concatMap cons loads
 >   where
 >     loads = filter (\x -> op x == LOAD) (concat trace)
 >
@@ -95,13 +48,39 @@ Reads-from and write-order edges.
 >     storeOf        = computeStoreOf (concat trace)
 >     prevLocalStore = computePrevLocalStore (concat trace)
 
+SC constraints
+==============
+
+Given a trace, generate constraints for sequential consistency.
+
+> constraintsSC :: [[Instr]] -> [Constraint]
+> constraintsSC = poSC \/ rfwo
+
+Program-order edges.
+
+> poSC :: [[Instr]] -> [Constraint]
+> poSC = map constraint . PO.poSC
+
+TSO constraints
+===============
+
+Given a trace, generate constraints for TSO.
+
+> constraintsTSO :: [[Instr]] -> [Constraint]
+> constraintsTSO = poTSO \/ rfwo
+
+Program-order edges.
+
+> poTSO :: [[Instr]] -> [Constraint]
+> poTSO = map constraint . PO.poTSO
+
 PSO constraints
 ===============
 
 Given a trace, generate constraints for PSO.
 
 > constraintsPSO :: [[Instr]] -> [Constraint]
-> constraintsPSO = poPSO \/ rfwoTSO 
+> constraintsPSO = poPSO \/ rfwo 
 
 Program-order edges.
 
@@ -114,7 +93,7 @@ RMO constraints
 Given a trace, generate constraints for PSO.
 
 > constraintsRMO :: [[Instr]] -> [Constraint]
-> constraintsRMO = poRMO \/ rfwoTSO 
+> constraintsRMO = poRMO \/ rfwo
 
 Program-order edges.
 

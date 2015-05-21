@@ -7,6 +7,8 @@
 > import System.IO.Unsafe
 > import Data.IORef
 > import Logger
+> import qualified Data.Map as M
+> import qualified Data.Set as S
 
 Types
 =====
@@ -76,7 +78,7 @@ Check constraints using Yices.
 >   do v <- readIORef verboseMode
 >      let s = toYices cs
 >      if v then putStrLn s else return ()
->      out <- myReadProcess "yices" [] s
+>      out <- myReadProcess "yices" ["--logic=QF_LIA"] s
 >      return $ if   take 3 out == "sat"
 >               then True
 >               else (if   take 5 out == "unsat"
@@ -87,7 +89,7 @@ Pure vesion of the above for convenience in property-testing.
 
 > {-# NOINLINE yices #-} 
 > yices :: [Constraint] -> Bool
-> yices cs = unsafePerformIO (logger (yicesCheck cs))
+> yices cs = unsafePerformIO (logger (yicesCheck $ simplify cs))
 
 Customised version of 'System.Process.readProcess'
 ==================================================
@@ -125,3 +127,58 @@ Global variable controlling verbosity
 > {-# NOINLINE verboseMode #-} 
 > verboseMode :: IORef Bool
 > verboseMode = unsafePerformIO (newIORef False)
+
+Constraint simplifier
+=====================
+
+> type Graph = M.Map InstrId (S.Set InstrId)
+
+> graph :: [(InstrId, InstrId)] -> Graph
+> graph [] = M.empty
+> graph ((x, y):es) = M.insertWith S.union x (S.singleton y) (graph es)
+
+> type SeqPoint = (S.Set InstrId, S.Set InstrId)
+
+> reachable :: Graph -> InstrId -> S.Set InstrId
+> reachable g x = r S.empty [x]
+>   where
+>     r v [] = v
+>     r v (x:xs)
+>       | x `S.member` v = r v xs
+>       | otherwise      = r (S.insert x v) (S.toList succs ++ xs)
+>       where succs      = M.findWithDefault S.empty x g
+
+> seqPoint :: Graph -> Graph -> InstrId -> SeqPoint
+> seqPoint forward backward x =
+>   (reachable backward x, reachable forward x)
+
+> path :: [SeqPoint] -> InstrId -> InstrId -> Bool
+> path sps x y = any f sps
+>   where f (before, after) = x `S.member` before && y `S.member` after
+
+> someVertices :: Int -> [Constraint] -> [InstrId]
+> someVertices n cs = nub $ every (length cs `div` n) cs
+>   where
+>     every m cs =
+>       case splitAt m cs of
+>         (pre, (x :-> y):post) -> x : every m post
+>         other                 -> []
+
+> simplify :: [Constraint] -> [Constraint]
+> simplify cs = reverse (cs0 ++ concatMap prune cs1)
+>   where
+>     -- Partition constraints
+>     cs0 = [(x :-> y) | (x :-> y) <- cs]
+>     cs1 = [(x :|: y) | (x :|: y) <- cs]
+> 
+>     -- Graphs (forward and backward edge variants)
+>     forward  = graph [(x, y) | (x :-> y) <- cs0]
+>     backward = graph [(y, x) | (x :-> y) <- cs0]
+> 
+>     -- Sequencing points
+>     sps = [seqPoint forward backward i | i <- someVertices 25 cs0]
+> 
+>     prune c@((x :-> y) :|: (v :-> w))
+>       | path sps x y = []
+>       | path sps v w = []
+>       | otherwise    = [c]
