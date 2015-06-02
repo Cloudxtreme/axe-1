@@ -334,12 +334,12 @@ Generator for small traces.
 
 > smallTraceOpts = 
 >   TraceOptions {
->     totalInstrs     = 8
->   , totalThreads    = 3
+>     totalInstrs     = 7
+>   , totalThreads    = 2
 >   , maxVals         = 3
 >   , maxAddrs        = 3
 >   , maxSyncs        = 1
->   , maxLLSCs        = 2
+>   , maxLLSCs        = 1
 >   , assumeLocalCons = True
 >   , onlySC          = False
 >   }
