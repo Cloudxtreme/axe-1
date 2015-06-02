@@ -1,3 +1,5 @@
+### A checker for SPARC memory consistency
+
 Axe is a tool that checks memory traces (consisting of load, store,
 atomic read-modify-write, and memory barrier instructions) against the
 SPARC memory consistency models: *sequential consistency* (SC), *total
