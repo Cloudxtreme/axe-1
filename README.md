@@ -19,7 +19,5 @@ Ubuntu/Debian packages:
     sudo apt-get install haskell-platform
     sudo apt-get install pandoc
 
-Also download Yices (version 2.3.1 or later) and make sure it is in
-your path:
-
-    http://yices.csl.sri.com/
+Also download [Yices](http://yices.csl.sri.com/) (version 2.3.1 or
+later) and make sure it is in your path.
