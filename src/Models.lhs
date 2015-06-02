@@ -35,7 +35,6 @@ Imports
 > import Instr
 > import qualified Axiomatic
 > import qualified Data.Map as M
-> import qualified Spec as Spec
 > import qualified Operational
 > import Data.Char
 

@@ -33,7 +33,6 @@ Local imports
 =============
 
 > import Instr
-> import qualified Spec
 > import qualified Axiomatic
 > import qualified Operational
 
