@@ -1,20 +1,19 @@
-% Matthew Naylor
-% University of Cambridge
-% June 2015
+A checker for SPARC memory consistency
+======================================
 
 Axe is a tool that checks memory traces (consisting of load, store,
 atomic read-modify-write, and memory barrier instructions) against the
 SPARC memory consistency models: *sequential consistency* (SC), *total
 store order* (TSO), partial store order (PSO) and *relaxed memory
-order* (RMO).  It was built to help verify the shared memory subsystem
-of the BERI multiprocessor, but could be used to verify other memory
+order* (RMO).  It was built to help test the shared memory subsystem
+of the BERI multiprocessor, but could be used to test other memory
 subsystems too.  It is written in Haskell and uses the Yices
 constraint solver.
 
 Axe is explained in more detail in this [report](doc/report.pdf).
 
 Dependencies
-============
+------------
 
 Ubuntu/Debian packages:
 
