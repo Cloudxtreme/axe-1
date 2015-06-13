@@ -391,7 +391,7 @@ For each load $l$ of value $v$ from address $a$ by thread $t$:
       * for each store $s' \neq s$ by a thread other than $t$
         to address $a$, add constraint $(s' < s) \vee (l < s')$.
 
-[^1]: Otherwise the trace is either not self-consistent or stores are
+[^1]: Otherwise the trace is either not read-consistent or stores are
 not unique.
 
 SC local constraints

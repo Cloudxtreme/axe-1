@@ -9,15 +9,14 @@ of the BERI multiprocessor, but could be used to test other memory
 subsystems too.  It is written in Haskell and uses the Yices
 constraint solver.
 
-Axe is explained in more detail in this [report](doc/report.pdf).
+Axe is explained in more detail in [this
+report](https://github.com/CTSRD-CHERI/axe/raw/master/doc/report.pdf).
 
 ### Dependencies
 
 Ubuntu/Debian packages:
 
-    sudo apt-get install ghc
-    sudo apt-get install haskell-platform
-    sudo apt-get install pandoc
+    sudo apt-get install ghc haskell-platform pandoc
 
 Also download [Yices](http://yices.csl.sri.com/) (version 2.3.1 or
 later) and make sure it is in your path.
