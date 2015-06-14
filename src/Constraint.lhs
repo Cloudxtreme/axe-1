@@ -140,6 +140,10 @@ This one doesn't echo standard error.
 >              --, delegate_ctlc = True
 >              }
 >      (Just stdIn, Just stdOut, _, h) <- createProcess p
+>      code <- getProcessExitCode h
+>      case code of
+>        Nothing -> return ()
+>        other   -> error "Command 'yices' not in PATH"
 >      hSetBuffering stdIn NoBuffering
 >      hSetBuffering stdOut NoBuffering
 >      hPutStr stdIn input
