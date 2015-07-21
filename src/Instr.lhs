@@ -132,6 +132,15 @@ Pretty printer
 >       helper [] = ""
 >       helper (x:xs) = concatMap show x ++ "\n" ++ helper xs
 
+Comparing instructions using uids
+=================================
+
+> instance Eq Instr where
+>   x == y = uid x == uid y
+
+> instance Ord Instr where
+>   x `compare` y = uid x `compare` uid y
+
 Functions on sets of instructions 
 =================================
 
@@ -334,11 +343,11 @@ Generator for small traces.
 
 > smallTraceOpts = 
 >   TraceOptions {
->     totalInstrs     = 7
->   , totalThreads    = 2
+>     totalInstrs     = 8
+>   , totalThreads    = 3
 >   , maxVals         = 3
 >   , maxAddrs        = 3
->   , maxSyncs        = 1
+>   , maxSyncs        = 2
 >   , maxLLSCs        = 1
 >   , assumeLocalCons = True
 >   , onlySC          = False

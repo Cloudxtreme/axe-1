@@ -460,12 +460,12 @@ Results
 =======
 
 We have tested the operational and axiomatic semantics of each model
-for equivalance on hundreds of thousands of small randomly-generated
-traces.  Each such trace consists of seven instructions running on two
-threads.  The small trace size is unfortunatly necessary due to the
-poor performance of the operational semantics.  Nevertheless, this
-gives us some confidence that our models are indeed defining what we
-intend them to define.
+for equivalance on millions of small randomly-generated traces.  Each
+such trace consists of ten instructions running on three threads.
+The small trace size is unfortunatly necessary due to the poor
+performance of the operational semantics.  Nevertheless, this gives us
+some confidence that our models are indeed defining what we intend
+them to define.
 
 We have constructed an HDL-level test bench that randomly generates
 sequences of memory instructions that are applied to the BERI memory

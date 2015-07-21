@@ -35,6 +35,7 @@ Imports
 > import Instr
 > import Data.List
 > import qualified Data.Map as M
+> import qualified Data.Set as S
 > import Control.Monad
 
 State
@@ -53,29 +54,41 @@ Buffer:
 >     instrs  :: M.Map ThreadId [Instr]
 >   , buffers :: M.Map ThreadId Buffer
 >   , mem     :: Mem
->   }
+>   } deriving (Eq, Ord)
 
 Non-deterministic state monad:
 
-> newtype ND a = ND { runND :: State -> [(State, a)] }
+> type Visited = S.Set State
+
+> newtype ND a = ND { runND :: Visited -> State -> (Visited, [(State, a)]) }
 
 > instance Monad ND where
->   return a = ND $ \s -> [(s, a)]
->   m >>= f  = ND $ \s ->
->     concat [ runND (f a) s'
->            | (s', a) <- runND m s ]
+>   return a = ND $ \v s -> (v, [(s, a)])
+>   m >>= f  = ND $ \v s ->
+>     let (v' , xs) = runND m v s
+>         (v'', ys) = mapAccumL (\v (s, a) -> runND (f a) v s) v' xs
+>     in  (v'', concat ys)
 
 > instance MonadPlus ND where
->   mzero       = ND $ \s -> []
->   x `mplus` y = ND $ \s -> runND x s ++ runND y s
+>   mzero       = ND $ \v s -> (v, [])
+>   x `mplus` y = ND $ \v s -> 
+>     let (v' , xs) = runND x v s
+>         (v'', ys) = runND y v' s
+>     in  (v'', xs ++ ys)
 
 Monadic routines:
 
 > getState :: ND State
-> getState = ND $ \s -> [(s, s)]
+> getState = ND $ \v s -> (v, [(s, s)])
 
 > putState :: State -> ND ()
-> putState s = ND $ \_ -> [(s, ())]
+> putState s = ND $ \v _ -> (v, [(s, ())])
+
+> getVisited :: ND Visited
+> getVisited = ND $ \v s -> (v, [(s, v)])
+
+> putVisited :: Visited -> ND ()
+> putVisited v = ND $ \_ s -> (v, [(s, ())])
 
 > fetchInstr :: ThreadId -> ND Instr
 > fetchInstr t =
@@ -159,12 +172,16 @@ Monadic routines:
 > whileNotDone :: ND () -> ND ()
 > whileNotDone m =
 >   do s <- getState
+>      v <- getVisited
 >      let done = all null (M.elems (instrs s))
 >              && all null (M.elems (buffers s))
->      if done then return () else m >> whileNotDone m
+>      if done then return () else
+>        case s `S.member` v of
+>          False -> putVisited (S.insert s v) >> m >> whileNotDone m
+>          True  -> mzero
 
 > run :: ND () -> [[Instr]] -> Bool
-> run m trace = not $ null $ runND (whileNotDone m) initialState
+> run m trace = not $ null $ snd $ runND (whileNotDone m) S.empty initialState
 >   where
 >     instrs       = concat trace
 >     tids         = threadIds instrs
