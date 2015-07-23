@@ -11,7 +11,7 @@ the development of well-defined concurrent programs.
 
 In this report, we address the problem of verifying a hardware
 implementation of shared memory against the SPARC memory consistency
-model.
+models.
 
 The hardware that we are verifying is the memory subsystem used in the
 BERI multi-processor [1], however the verification tool we present
@@ -62,12 +62,11 @@ The challenge
 -------------
 
 Memory consistency models are highly non-determinisic meaning that
-even a small program can have a very large number of allowed behaviours.
-In our experience, simple exhaustive enumeration of all behaviours
-does not usefully scale to checking traces beyond 10-15 instructions
-in size.  Our goal is to be able to check many thousands of
-instructions per second -- somewhere close to the rate at which we can
-simulate them.
+even a small program can have a very large number of allowed
+behaviours.  In our experience, naive exhaustive enumeration of all
+behaviours does not usefully scale to checking traces beyond 10-15
+instructions in size.  We would like to be able to check traces
+containing thousands of instructions in seconds.
 
 One possible way to reduce the amount of non-determinism is to modify
 the hardware to emit extra trace information that can rule out many
@@ -80,13 +79,11 @@ Our solution
 
 We present a checking tool for SPARC memory consistency which includes:
 
-  * an executable *operational semantics*: easy to understand
-    but too slow to be used as a checker;
+  * an executable *operational semantics* and an equivalant *axiomatic
+    semantics* for each consistency model (SC, TSO, PSO and RMO);
 
-  * an equivalant *axiomatic semantics*: harder to understand but
-    can generate constraints that are fed to a state-of-the-art
-    solver capable of checking traces containing thousands of instructions
-    in under a second;
+  * the axiomatic version can generate constraints that are fed to a
+    state-of-the-art SMT solver;
 
   * an automatic test framework that can check the operational and
     axiomatic versions of the models for equivalence on large numbers
@@ -110,12 +107,6 @@ but has the following differences.
 
   * Although our checker does not provide the same level of
     performance as TSOtool, it is performant enough to be useful.
-
-Our checker is also somewhat related to a tool called *Murphi* [4]
-that is officially cited in the SPARC reference manual.  However:
-_"The tools work by exhaustively enumerating system states in a
-version of the memory model, so they can only be applied to fairly
-small assembly code examples."_ [5]
 
 Trace format
 ============
@@ -331,6 +322,13 @@ value to be written to $a$ occurring before the load in $B(t)$.
 
   2. If $w$ does not exist and $v \neq M(a)$ then $\textbf{fail}$.
 
+Performance tweak
+-----------------
+
+A simple but fairly effective performance improvement to the above
+operational models is to immediately backtrack when reaching a state
+that has been visited before.
+
 Axiomatic semantics
 ===================
 
@@ -462,34 +460,25 @@ Results
 We have tested the operational and axiomatic semantics of each model
 for equivalance on millions of small randomly-generated traces.  Each
 such trace consists of ten instructions running on three threads.
-The small trace size is unfortunatly necessary due to the poor
-performance of the operational semantics.  Nevertheless, this gives us
-some confidence that our models are indeed defining what we intend
-them to define.
+This gives us some confidence that our models are indeed defining what
+we intend them to define.
 
 We have constructed an HDL-level test bench that randomly generates
 sequences of memory instructions that are applied to the BERI memory
 subsytem.  Before generating each test-sequence, a selection of shared
 memory addresses are picked at random to be used by that test-sequence
 (the number of addresses used is customisable).  Each test-sequence
-results in a trace that is then checked by our tool.  Figure 1 shows
-the performance of our checker in this role: we can check
+results in a trace that is then checked by our tool.  Loads, stores,
+and read-modify-write instructions are generated with a 31.25%
+probability, and memory barriers with a 6.25% probability.  Figures
+1--4 shows the performance of our checker in this role: we can check
 test-sequences containing a thousand instructions in a fraction of a
 second; however, checking several thousand instructions starts to
 become costly.  At the time of writing, the latest stable version of
-our shared memory subsystem satisfies TSO on hundreds of thousands of
+our shared memory subsystem satisfies TSO on millions of
 thousand-element test-sequences, which provides a high degree of
 confidence in the hardware under test.  Soon we will apply our checker
 to a new, heavily refactored version of the memory subsystem.
-
-![Checking a 3-thread version of the BERI memory subsystem against TSO
-on randomly-generated instruction sequences.  This graph contains 250
-samples in total.  Loads, stores, and read-modify-write instructions
-have each been generated with a 31.25% probability, and memory
-barriers with a 6.25% probability.  Each test run uses up to four
-shared memory locations (the particular locations used are chosen
-randomly at the beginning of each test run).  Version 2.3.1 of Yices
-has been used, with the `QF_LIA` logic specified.](3threads.png)
 
 References
 ==========
@@ -512,3 +501,15 @@ Germond, 2003.
 
 [6] The Yices SMT Solver, Stanford Research Institute,
 *http://yices.csl.sri.com/*.
+
+![Checking a 3-thread version of the BERI memory subsystem against TSO
+with 16 shared variables](tso_3t_16v.png)
+
+![Checking a 3-thread version of the BERI memory subsystem against RMO
+with 16 shared variables](rmo_3t_16v.png)
+
+![Checking a 3-thread version of the BERI memory subsystem against TSO
+with 4 shared variables](tso_3t_4v.png)
+
+![Checking a 3-thread version of the BERI memory subsystem against RMO
+with 4 shared variables](rmo_3t_4v.png)
