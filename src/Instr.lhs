@@ -147,24 +147,37 @@ Functions on sets of instructions
 For all a find all stores to address a.
 
 > computeStoresTo :: [Instr] -> M.Map Addr [Instr]
-> computeStoresTo instrs =
->   case instrs of
->     []     -> M.empty
->     (i:is) -> if   op i == STORE
->               then M.insertWith (++) (addr i) [i] m
->               else m
->       where m = computeStoresTo is
+> computeStoresTo instrs = find M.empty instrs
+>   where
+>     find m [] = m
+>     find m (i:is)
+>       | op i == STORE = find m' is
+>       | otherwise     = find m is
+>       where m' = M.insertWith (++) (addr i) [i] m
+
+For all a find first store to address a by each thread.
+
+> computeFirstStoresTo :: [Instr] -> M.Map Addr [Instr]
+> computeFirstStoresTo instrs = find M.empty instrs
+>   where
+>     find m [] = m
+>     find m (i:is)
+>       | op i == STORE && new = find m' is
+>       | otherwise            = find m is
+>       where
+>         m'  = M.insertWith (++) (addr i) [i] m
+>         new = tid i `notElem` map tid (M.findWithDefault [] (addr i) m)
 
 For all (v,a) find store of value v to address a.
 
 > computeStoreOf :: [Instr] -> M.Map (Data, Addr) Instr
-> computeStoreOf instrs =
->   case instrs of
->     []     -> M.empty
->     (i:is) -> if   op i == STORE
->               then M.insert (val i, addr i) i m
->               else m
->       where m = computeStoreOf is
+> computeStoreOf instrs = find M.empty instrs
+>   where
+>     find m [] = m
+>     find m (i:is)
+>       | op i == STORE = find m' is
+>       | otherwise     = find m is
+>       where m' = M.insert (val i, addr i) i m
 
 For all load instructions, find the last value stored to that load's
 address on that load's thread.
@@ -180,6 +193,21 @@ address on that load's thread.
 >                    Nothing -> step instrs m
 >                    Just i  -> M.insert (uid instr) i (step instrs m)
 >         SYNC  -> step instrs m
+
+For all store instructions, find the next value stored to that stores's
+address on that stores's thread.
+
+> computeNextLocalStore :: [Instr] -> M.Map InstrId Instr
+> computeNextLocalStore instrs = step instrs M.empty
+>   where
+>     step [] m = M.empty
+>     step (instr:instrs) m =
+>       case op instr of
+>         STORE -> case M.lookup (tid instr, addr instr) m of
+>                    Nothing -> step instrs $
+>                                 M.insert (tid instr, addr instr) instr m
+>                    Just i  -> M.insert (uid i) instr (step instrs m)
+>         _     -> step instrs m
 
 Lookup function for above mappings.
 
@@ -343,12 +371,12 @@ Generator for small traces.
 
 > smallTraceOpts = 
 >   TraceOptions {
->     totalInstrs     = 8
+>     totalInstrs     = 10
 >   , totalThreads    = 3
 >   , maxVals         = 3
 >   , maxAddrs        = 3
 >   , maxSyncs        = 2
->   , maxLLSCs        = 1
+>   , maxLLSCs        = 2
 >   , assumeLocalCons = True
 >   , onlySC          = False
 >   }

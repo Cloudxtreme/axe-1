@@ -43,24 +43,12 @@ Types
 =====
 
 > data Constraint =
->     InstrId :-> InstrId
->   | InstrId :== InstrId
+>     Instr :-> Instr
 >   | Constraint :|: Constraint
->   | Constraint :<=> Constraint
 >   | Fail
 
 Combinators
 ===========
-
-Construct happens-before constraint between two instructions.
-
-> (-->) :: Instr -> Instr -> Constraint
-> x --> y = uid x :-> uid y
-
-Happen at same time:
-
-> (===) :: Instr -> Instr -> Constraint
-> x === y = uid x :== uid y
 
 Union two list generators, useful for unioning constraint sets.
 
@@ -79,26 +67,21 @@ Convert constraint to Yices format.
 >   ++ "(check)\n"
 >   ++ "(exit)\n"
 >   where
->     var v = "v" ++ show v
+>     var i = "v" ++ show (uid i)
 >
 >     vars (x :-> y)  = [var x, var y]
->     vars (x :== y)  = [var x, var y]
 >     vars (c :|: d)  = vars c ++ vars d
->     vars (c :<=> d) = vars c ++ vars d
 >     vars Fail       = []
 >
 >     translate (x :-> y) = "(< " ++ var x ++ " " ++ var y ++ ")"
->     translate (x :== y) = "(= " ++ var x ++ " " ++ var y ++ ")"
 >     translate (c :|: d) =
 >       "(or " ++ translate c ++ " " ++ translate d ++ ")"
->     translate (c :<=> d) =
->       "(= " ++ translate c ++ " " ++ translate d ++ ")"
 >     translate Fail = "false"
 >
 >     assert c = "(assert " ++ translate c ++ ")"
 >
 >     varDecls = unlines [ "(define " ++ v ++ " :: int)"
->                        | v <- nub (concatMap vars cs) ]
+>                        | v <- S.toList $ S.fromList (concatMap vars cs) ]
 
 Check constraints using Yices.
 
@@ -118,7 +101,7 @@ Pure vesion of the above for convenience in property-testing.
 
 > {-# NOINLINE yices #-} 
 > yices :: [Constraint] -> Bool
-> yices cs = unsafePerformIO (logger (yicesCheck $ simplify cs))
+> yices cs = unsafePerformIO (logger (yicesCheck cs))
 
 Customised version of 'System.Process.readProcess'
 ==================================================
@@ -163,6 +146,8 @@ Global variable controlling verbosity
 Constraint simplifier
 =====================
 
+The following constraint simplifier is no longer used.
+
 > type Graph = M.Map InstrId (S.Set InstrId)
 
 > graph :: [(InstrId, InstrId)] -> Graph
@@ -193,7 +178,7 @@ Constraint simplifier
 >   where
 >     every m cs =
 >       case splitAt m cs of
->         (pre, (x :-> y):post) -> x : every m post
+>         (pre, (x :-> y):post) -> uid x : every m post
 >         other                 -> []
 
 > simplify :: [Constraint] -> [Constraint]
@@ -204,13 +189,13 @@ Constraint simplifier
 >     cs1 = [(x :|: y) | (x :|: y) <- cs]
 > 
 >     -- Graphs (forward and backward edge variants)
->     forward  = graph [(x, y) | (x :-> y) <- cs0]
->     backward = graph [(y, x) | (x :-> y) <- cs0]
+>     forward  = graph [(uid x, uid y) | (x :-> y) <- cs0]
+>     backward = graph [(uid y, uid x) | (x :-> y) <- cs0]
 > 
 >     -- Sequencing points
 >     sps     = [seqPoint forward backward i | i <- someVertices 50 cs0]
 > 
 >     prune c@((x :-> y) :|: (v :-> w))
->       | path sps x y = []
->       | path sps v w = []
->       | otherwise    = [c]
+>       | path sps (uid x) (uid y) = []
+>       | path sps (uid v) (uid w) = []
+>       | otherwise                = [c]

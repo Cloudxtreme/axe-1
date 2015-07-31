@@ -34,12 +34,19 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
+import sys
 
-with open("/tmp/AxeLen.txt") as f:
-  X = [float(n) for n in f.read().splitlines()]
+if len(sys.argv) != 3:
+  print "usage: plot.py [input.txt] [output.png]"
+  sys.exit()
 
-with open("/tmp/AxeTime.txt") as f:
-  Y = [float(t[:-1]) for t in f.read().splitlines()]
+X=[]
+Y=[]
+with open(sys.argv[1]) as f:
+  for line in f:
+    fields = line.split()
+    X.append(float(fields[0]))
+    Y.append(float(fields[1][:-1]))
 
 fig = plt.figure()
 ax = fig.add_subplot(111)
@@ -52,13 +59,13 @@ plt.xticks(fontsize=12)
 plt.yticks(fontsize=12)
 plt.margins(0.1)
 
-plt.xlim([0,5000])
-plt.ylim([0,16])
+plt.xlim([0,34000])
+plt.ylim([0,15])
 
 plt.ylabel("Time (s)", fontsize=14)
 plt.xlabel("\nNumber of instructions", fontsize=14)
 
-plt.plot(X[0:249], Y[0:249], 'b.')
+plt.plot(X[0:], Y[0:], 'b.')
 
 #plt.show()
-plt.savefig("3threads.png")
+plt.savefig(sys.argv[2])

@@ -33,6 +33,8 @@ specific language governing permissions and limitations under the License.
 > import Constraint
 > import qualified LocalOrder as PO
 > import qualified Data.Map as M
+> import Data.Maybe
+> import DataFlow
 
 Solvers
 =======
@@ -49,32 +51,81 @@ Solvers
 > isRMO :: [[Instr]] -> Bool
 > isRMO = yices . constraintsRMO
 
-Reads-from and write-order edges
-================================
+Reads-from and write-order edges (version 1)
+============================================
 
 > rfwo :: [[Instr]] -> [Constraint]
 > rfwo trace = concatMap cons loads
 >   where
->     loads = filter (\x -> op x == LOAD) (concat trace)
+>     loads = filter (\x -> op x == LOAD) t
 >
 >     cons x
->       | val x == Data 0 = [ x --> s' | s' <- others ]
->       | otherwise       = [ s --> x  | tid s /= tid x ]
->                        ++ [ p --> s  | p <- prev, tid s /= tid x ]
->                        ++ [ (s' --> s) :|:
->                             (x  --> s')
->                           | s' <- others, uid s /= uid s' ]
+>       | val x == Data 0 = [ x :-> s' | s' <- others ]
+>       | otherwise       = [ s :-> x  | tid s /= tid x ]
+>                        ++ [ p :-> s  | p <- prev, tid s /= tid x ]
+>                        ++ [ x :-> n  | n <- next, tid n /= tid x ]
+>                        ++ [ (s' :-> s) :|:
+>                             (x  :-> s')
+>                           | s' <- others, uid s /= uid s',
+>                                           tid s /= tid s' ]
 >       where
 >         s      = storeOf ! (val x, addr x)
 >         stores = M.findWithDefault [] (addr x) storesTo
 >         others = [ s' | s' <- stores, tid x /= tid s' ]
->         prev   = case M.lookup (uid x) prevLocalStore of
->                    Nothing -> []
->                    Just p  -> [p]
+>         prev   = maybeToList $ M.lookup (uid x) prevLocalStore
+>         next   = maybeToList $ M.lookup (uid s) nextLocalStore
 >
->     storesTo       = computeStoresTo (concat trace)
->     storeOf        = computeStoreOf (concat trace)
->     prevLocalStore = computePrevLocalStore (concat trace)
+>     t              = concat trace
+>     storesTo       = computeStoresTo t
+>     storeOf        = computeStoreOf t
+>     prevLocalStore = computePrevLocalStore t
+>     nextLocalStore = computeNextLocalStore t
+
+Reads-from and write-order edges (version 2)
+============================================
+
+> rf :: [[Instr]] -> [Constraint]
+> rf trace = concatMap cons loads
+>   where
+>     loads = filter (\x -> op x == LOAD) t
+>
+>     cons x
+>       | val x == Data 0 = [ x :-> s' | s' <- others ]
+>       | otherwise       = [ s :-> x  | tid s /= tid x ]
+>                        ++ [ p :-> s  | p <- prev, tid s /= tid x ]
+>                        ++ [ x :-> n  | n <- next, tid n /= tid x ]
+>       where
+>         s      = storeOf ! (val x, addr x)
+>         stores = M.findWithDefault [] (addr x) storesTo
+>         others = [ s' | s' <- stores, tid x /= tid s' ]
+>         prev   = maybeToList $ M.lookup (uid x) prevLocalStore
+>         next   = maybeToList $ M.lookup (uid s) nextLocalStore
+>
+>     t              = concat trace
+>     storesTo       = computeFirstStoresTo t
+>     storeOf        = computeStoreOf t
+>     prevLocalStore = computePrevLocalStore t
+>     nextLocalStore = computeNextLocalStore t
+
+> rfwo2 :: ([[Instr]] -> [Constraint]) -> [[Instr]] -> [Constraint]
+> rfwo2 po trace = cs ++ concatMap cons loads
+>   where
+>     cs    = po trace ++ rf trace
+>     loads = filter (\x -> op x == LOAD) t
+>
+>     cons x
+>       | val x == Data 0 = []
+>       | otherwise       = [ (s' :-> s) :|: (x :-> s')
+>                           | s' <- stores, uid s /= uid s',
+>                             tid s /= tid s', tid s' /= tid x ]
+>       where
+>         s      = storeOf ! (val x, addr x)
+>         stores = getUnorderedWrites pwo s x
+>
+>     pwo      = analyseWriteOrder cs
+>     t        = concat trace
+>     storeOf  = computeStoreOf t
+>     storesTo = computeStoresTo t
 
 SC constraints
 ==============
@@ -82,12 +133,8 @@ SC constraints
 Given a trace, generate constraints for sequential consistency.
 
 > constraintsSC :: [[Instr]] -> [Constraint]
-> constraintsSC = poSC \/ rfwo
-
-Program-order edges.
-
-> poSC :: [[Instr]] -> [Constraint]
-> poSC = map constraint . PO.poSC
+> constraintsSC = rfwo2 PO.poSC
+> --constraintsSC = PO.poSC \/ rfwo
 
 TSO constraints
 ===============
@@ -95,12 +142,8 @@ TSO constraints
 Given a trace, generate constraints for TSO.
 
 > constraintsTSO :: [[Instr]] -> [Constraint]
-> constraintsTSO = poTSO \/ rfwo
-
-Program-order edges.
-
-> poTSO :: [[Instr]] -> [Constraint]
-> poTSO = map constraint . PO.poTSO
+> constraintsTSO = rfwo2 PO.poTSO
+> --constraintsTSO = PO.poTSO \/ rfwo
 
 PSO constraints
 ===============
@@ -108,12 +151,8 @@ PSO constraints
 Given a trace, generate constraints for PSO.
 
 > constraintsPSO :: [[Instr]] -> [Constraint]
-> constraintsPSO = poPSO \/ rfwo 
-
-Program-order edges.
-
-> poPSO :: [[Instr]] -> [Constraint]
-> poPSO = map constraint . PO.poPSO
+> constraintsPSO = rfwo2 PO.poPSO
+> --constraintsPSO = PO.poPSO \/ rfwo 
 
 RMO constraints
 ===============
@@ -121,15 +160,5 @@ RMO constraints
 Given a trace, generate constraints for PSO.
 
 > constraintsRMO :: [[Instr]] -> [Constraint]
-> constraintsRMO = poRMO \/ rfwo
-
-Program-order edges.
-
-> poRMO :: [[Instr]] -> [Constraint]
-> poRMO = map constraint . PO.poRMO
-
-Convert edges to constraints
-============================
-
-> constraint :: PO.Edge -> Constraint
-> constraint (a, b) = uid a :-> uid b
+> constraintsRMO = rfwo2 PO.poRMO
+> --constraintsRMO = PO.poRMO \/ rfwo
